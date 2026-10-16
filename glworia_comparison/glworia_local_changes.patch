@@ -1,0 +1,84 @@
+diff --git a/glworia/pe/waveform.py b/glworia/pe/waveform.py
+index 2a1f0ee..175510b 100644
+--- a/glworia/pe/waveform.py
++++ b/glworia/pe/waveform.py
+@@ -15,6 +15,16 @@ from scipy.constants import c, G
+ Msun = 1.9884099e+30
+ Mtow = 8*np.pi*G/c**3*Msun
+ 
++# Local fix (2026-10-08): F(w) is computed with the e^{+iwT} convention, while LAL waveforms use
++# h(f) = int h(t) e^{-2 pi i f t} dt. The lensed LAL waveform is therefore conj(F) * h, which puts
++# later images later in time. 'lal' (default) applies conj(F); 'glworia' keeps the released behaviour.
++def to_fourier_convention(Fs, fourier_convention):
++    if fourier_convention == 'lal':
++        return np.conj(Fs)
++    if fourier_convention != 'glworia':
++        raise ValueError("fourier_convention must be 'lal' or 'glworia'")
++    return Fs
++
+ from ..amp.load_interp import *
+ 
+ def lal_binary_black_hole_lensed(
+@@ -23,7 +33,8 @@ def lal_binary_black_hole_lensed(
+ 
+     ws = frequency_array*Mtow*MLz
+     F_interp = kwargs['F_interp']
+-    Fs = F_interp(ws, y, lp)
++    fourier_convention = kwargs.pop('fourier_convention', 'lal')
++    Fs = to_fourier_convention(F_interp(ws, y, lp), fourier_convention)
+     del kwargs['F_interp']
+     waveform_kwargs = dict(
+         waveform_approximant='IMRPhenomXAS', reference_frequency=50.0,
+@@ -83,7 +94,8 @@ def lal_binary_black_hole_lensed_relative_binning(
+             phi_12=phi_12, lambda_1=0.0, lambda_2=0.0, **waveform_kwargs)
+         ws = waveform_kwargs["frequencies"]*Mtow*MLz
+     F_interp = kwargs['F_interp']
+-    Fs = F_interp(ws, y, lp)
++    fourier_convention = kwargs.pop('fourier_convention', 'lal')
++    Fs = to_fourier_convention(F_interp(ws, y, lp), fourier_convention)
+     del kwargs['F_interp']
+     waveform_dict["plus"] *= Fs
+     waveform_dict["cross"] *= Fs
+diff --git a/interpolation_settings/CIS_prod1.json b/interpolation_settings/CIS_prod1.json
+index af71d76..e167644 100644
+--- a/interpolation_settings/CIS_prod1.json
++++ b/interpolation_settings/CIS_prod1.json
+@@ -26,5 +26,10 @@
+     "N_crit_im": 401,
+ 
+     "newt_max_iter_im": 1000,
+-    "crit_lp_N_im": 10001
++    "crit_lp_N_im": 10001,
++
++    "im_x_init_low": -10,
++    "im_x_init_high": 10,
++    "im_x_init_num": 100,
++    "im_screen_round_decimal": 8
+ }
+\ No newline at end of file
+diff --git a/scripts/PE_full.py b/scripts/PE_full.py
+index dc25544..2dff11f 100644
+--- a/scripts/PE_full.py
++++ b/scripts/PE_full.py
+@@ -86,6 +86,9 @@ if inject_lensed or model_lensed:
+     waveform_arguments_lensed = waveform_arguments_unlensed.copy()
+     # Fixed arguments passed into the source model
+     waveform_arguments_lensed.update(F_interp = F_interp_loaded)
++    # Local fix (2026-10-08): conj(F) for LAL's Fourier convention; see glworia/pe/waveform.py
++    waveform_arguments_lensed.update(fourier_convention = misc.get('fourier_convention', 'lal'))
++    print('fourier_convention =', waveform_arguments_lensed['fourier_convention'])
+ 
+ injection_parameters_unlensed = injection_parameters_lensed.copy()
+ for key in ['y', 'lp', 'MLz']:
+diff --git a/scripts/do_interpolation.py b/scripts/do_interpolation.py
+index 1183c4f..b85c1df 100644
+--- a/scripts/do_interpolation.py
++++ b/scripts/do_interpolation.py
+@@ -1,5 +1,5 @@
+-from jax.config import config
+-config.update("jax_enable_x64", True)
++import jax
++jax.config.update("jax_enable_x64", True)
+ 
+ from glworia.amp.interpolate import interpolate, interpolate_im
+ import argparse

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "n": 128000,
+  "u_max": 1.0,
+  "dtype": "float64",
+  "dim": 1,
+  "build_time_sec": 425.48595714289695,
+  "cores_used": 1,
+  "files": {
+    "x": "gl1d_n128000_U1_hd0ff5974b6aa52cf.x.npy",
+    "w": "gl1d_n128000_U1_hd0ff5974b6aa52cf.w.npy"
+  },
+  "sha256": {
+    "x": "16ef31e418366a1fe0681fc5a192dd47a39c107e34913ba76827ada95208fa92",
+    "w": "65fb7f8b870bd833ffb5ec0b764932c741e795849641761f7e2a2ff8815016e6"
+  },
+  "hostname": "holy8a26402.rc.fas.harvard.edu",
+  "created": 1790232484.8950813,
+  "note": "scipy.special.roots_legendre (O(n)); numpy leggauss is O(n^3)"
+}

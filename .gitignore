@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+# Large outputs written by the pipeline
+fiona_w_table_cache/
+full_parameter_inference/
+glworia_repo/outdir/
+figures/
+# Slurm logs
+*.out
+*.err
+# Temporary node-cache files
+fiona_gl_cache/*.tmp

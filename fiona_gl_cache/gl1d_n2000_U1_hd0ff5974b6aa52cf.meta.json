@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "n": 2000,
+  "u_max": 1.0,
+  "dtype": "float64",
+  "dim": 1,
+  "build_time_sec": 0.8748476398177445,
+  "cores_used": 1,
+  "files": {
+    "x": "gl1d_n2000_U1_hd0ff5974b6aa52cf.x.npy",
+    "w": "gl1d_n2000_U1_hd0ff5974b6aa52cf.w.npy"
+  },
+  "sha256": {
+    "x": "86d800312ed1f654736f99f300f4d3f5d61621a078f2f0f2b0615fe76f0440c9",
+    "w": "1838905fbefc68aa8ae66d147b27c50562d988c82b9da791a6dcea473ee82820"
+  },
+  "hostname": "holylogin05.rc.fas.harvard.edu",
+  "created": 1784673389.7504501
+}

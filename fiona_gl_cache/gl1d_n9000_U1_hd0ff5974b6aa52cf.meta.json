@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "n": 9000,
+  "u_max": 1.0,
+  "dtype": "float64",
+  "dim": 1,
+  "build_time_sec": 60.96469744108617,
+  "cores_used": 1,
+  "files": {
+    "x": "gl1d_n9000_U1_hd0ff5974b6aa52cf.x.npy",
+    "w": "gl1d_n9000_U1_hd0ff5974b6aa52cf.w.npy"
+  },
+  "sha256": {
+    "x": "2e11ea83c0e999e09b5180ffc64385c3cfa882fb3c26a4ae4254a74b11e5475a",
+    "w": "be7e6308433b704b9a4093c771e063b41df04b8669a6b0723416133089a1fca9"
+  },
+  "hostname": "holy8a24604.rc.fas.harvard.edu",
+  "created": 1784674037.145592
+}
