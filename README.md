@@ -95,8 +95,8 @@ The paper's results were produced with this environment.
 `requirements.txt` lists the full set.
 
 ```bash
-git clone https://github.com/ninoephremidze/GW-lensing-inference-with-FIONA.git
-cd GW-lensing-inference-with-FIONA
+git clone https://github.com/ninoephremidze/infer_with_FIONA.git
+cd infer_with_FIONA
 conda create -n gwlens python=3.11
 conda activate gwlens
 pip install -r requirements.txt
