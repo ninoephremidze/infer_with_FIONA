@@ -1,0 +1,181 @@
+{
+ "fiona": {
+  "CIS_glworia_repro_mlz1000_xc0.02_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 33.519,
+   "num_likelihood_evaluations": 191056002,
+   "log_evidence": -8095.400974396191,
+   "log_bayes_factor": 3421.503697300726,
+   "n_samples": 6225
+  },
+  "CIS_glworia_repro_mlz100_xc0.02_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 23.58,
+   "num_likelihood_evaluations": 155219289,
+   "log_evidence": -8086.975386588636,
+   "log_bayes_factor": 2870.845173176652,
+   "n_samples": 6644
+  },
+  "CIS_glworia_repro_mlz10_xc0.02_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 13.412,
+   "num_likelihood_evaluations": 87087054,
+   "log_evidence": -8076.988071188143,
+   "log_bayes_factor": 890.4967478226931,
+   "n_samples": 7119
+  },
+  "CIS_glworia_repro_mlz300_xc0.02_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 29.913,
+   "num_likelihood_evaluations": 182321968,
+   "log_evidence": -8093.763372541523,
+   "log_bayes_factor": 3529.6774151948184,
+   "n_samples": 6482
+  },
+  "CIS_glworia_repro_mlz30_xc0.02_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 22.846,
+   "num_likelihood_evaluations": 125866021,
+   "log_evidence": -8082.434959658567,
+   "log_bayes_factor": 1404.8751552940373,
+   "n_samples": 6554
+  },
+  "CIS_glworia_repro_mlz3_xc0.02_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 10.604,
+   "num_likelihood_evaluations": 82342408,
+   "log_evidence": -8072.948646537488,
+   "log_bayes_factor": 669.2167699397312,
+   "n_samples": 6904
+  },
+  "CIS_glworia_repro_mlz100_xc0.2_y1.0_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 25.479,
+   "num_likelihood_evaluations": 173949916,
+   "log_evidence": -8079.736767317578,
+   "log_bayes_factor": 1142.2980831554867,
+   "n_samples": 6622
+  },
+  "CIS_glworia_repro_mlz100_xc0.2_y2.0_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 12.81,
+   "num_likelihood_evaluations": 93623715,
+   "log_evidence": -8072.410172944117,
+   "log_bayes_factor": 738.9978709950284,
+   "n_samples": 6285
+  },
+  "CIS_glworia_repro_mlz100_xc0.2_y3.0_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0": {
+   "sampling_time_hours": 14.928,
+   "num_likelihood_evaluations": 105474232,
+   "log_evidence": -8072.476493596363,
+   "log_bayes_factor": 632.2368709873986,
+   "n_samples": 6498
+  },
+  "ULA_glworia_repro_mlz1000_rs0.1_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 39.727,
+   "num_likelihood_evaluations": 234663492,
+   "log_evidence": -8086.068688588548,
+   "log_bayes_factor": 1704.3814699569011,
+   "n_samples": 7223
+  },
+  "ULA_glworia_repro_mlz100_rs0.1_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 19.737,
+   "num_likelihood_evaluations": 122068308,
+   "log_evidence": -8083.401692065859,
+   "log_bayes_factor": 1695.8977962483614,
+   "n_samples": 6817
+  },
+  "ULA_glworia_repro_mlz10_rs0.1_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 21.0,
+   "num_likelihood_evaluations": 116680206,
+   "log_evidence": -8072.922318119109,
+   "log_bayes_factor": 581.3460113273094,
+   "n_samples": 7116
+  },
+  "ULA_glworia_repro_mlz300_rs0.1_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 39.003,
+   "num_likelihood_evaluations": 218371378,
+   "log_evidence": -8083.442046325652,
+   "log_bayes_factor": 2012.7670017711584,
+   "n_samples": 6245
+  },
+  "ULA_glworia_repro_mlz30_rs0.1_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 14.909,
+   "num_likelihood_evaluations": 84666727,
+   "log_evidence": -8078.516838744882,
+   "log_bayes_factor": 840.6877350947367,
+   "n_samples": 6677
+  },
+  "ULA_glworia_repro_mlz3_rs0.1_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 27.274,
+   "num_likelihood_evaluations": 125679437,
+   "log_evidence": -8070.58224949302,
+   "log_bayes_factor": 504.51562818749693,
+   "n_samples": 6991
+  },
+  "PBH_glworia_repro_mlz1000_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 29.199,
+   "num_likelihood_evaluations": 217252994,
+   "log_evidence": -8085.934309690543,
+   "log_bayes_factor": 1704.2382258278665,
+   "n_samples": 6220
+  },
+  "PBH_glworia_repro_mlz100_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 15.458,
+   "num_likelihood_evaluations": 117223801,
+   "log_evidence": -8083.034361668872,
+   "log_bayes_factor": 1696.2274984581863,
+   "n_samples": 6655
+  },
+  "PBH_glworia_repro_mlz10_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 18.017,
+   "num_likelihood_evaluations": 126941968,
+   "log_evidence": -8073.106177038555,
+   "log_bayes_factor": 581.2143557639215,
+   "n_samples": 7094
+  },
+  "PBH_glworia_repro_mlz300_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 31.58,
+   "num_likelihood_evaluations": 212819517,
+   "log_evidence": -8083.185026145429,
+   "log_bayes_factor": 2012.8475446586976,
+   "n_samples": 6197
+  },
+  "PBH_glworia_repro_mlz30_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 11.556,
+   "num_likelihood_evaluations": 81883760,
+   "log_evidence": -8078.85000009052,
+   "log_bayes_factor": 840.4699955143357,
+   "n_samples": 6665
+  },
+  "PBH_glworia_repro_mlz3_y0.3_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0": {
+   "sampling_time_hours": 19.182,
+   "num_likelihood_evaluations": 129076979,
+   "log_evidence": -8070.837594742919,
+   "log_bayes_factor": 504.2656676311321,
+   "n_samples": 6986
+  }
+ },
+ "glworia": {
+  "MLz_100.0_dL_500.0_y_0.3000_xc_0.0200_lal_loguniform": {
+   "sampling_time_hours": 56.965,
+   "num_likelihood_evaluations": 161674505,
+   "log_evidence": -8086.650743905763,
+   "log_bayes_factor": 2863.5405736920156,
+   "n_samples": 6323
+  },
+  "MLz_100.0_dL_500.0_y_1.0000_xc_0.2000_lal_loguniform": {
+   "sampling_time_hours": 58.179,
+   "num_likelihood_evaluations": 173457892,
+   "log_evidence": -8080.011812512527,
+   "log_bayes_factor": 1142.7130283700346,
+   "n_samples": 6699
+  },
+  "MLz_100.0_dL_500.0_y_2.0000_xc_0.2000_lal_loguniform": {
+   "sampling_time_hours": 34.463,
+   "num_likelihood_evaluations": 98116899,
+   "log_evidence": -8072.396171944194,
+   "log_bayes_factor": 739.2582001497918,
+   "n_samples": 6113
+  },
+  "MLz_100.0_dL_500.0_y_3.0000_xc_0.2000_lal_loguniform": {
+   "sampling_time_hours": 38.522,
+   "num_likelihood_evaluations": 101114697,
+   "log_evidence": -8072.323590265449,
+   "log_bayes_factor": 632.6075890310875,
+   "n_samples": 6368
+  }
+ }
+}

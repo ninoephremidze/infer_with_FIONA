@@ -11,6 +11,7 @@ This repository contains the code behind every Fisher-forecast and Bayesian-infe
 
 | I want to... | Run |
 |---|---|
+| Get a guided tour of the results | the notebooks in `notebooks/` (below) |
 | Remake the paper's figures | `scripts/5_figures/*.py`, which read the posterior samples shipped in `results/posteriors/` |
 | Reproduce the Fisher forecasts | `scripts/1_fisher/fisher_forecasts.py` |
 | Run Bayesian inference on a lensed signal | `scripts/4_inference/run_inference_cis.py` or `run_inference_ula_pbh.py` |
@@ -45,6 +46,16 @@ Against direct, converged FIONA evaluations at 130 test lenses across the CIS pr
 
 On the four CIS benchmarks of Cheung et al. (2024), hereafter C24, this pipeline and the released [`glworia`](https://github.com/mhycheung/glworia) code give posteriors whose medians agree to within $0.06\sigma$ in every parameter, on identical data. This pipeline completes each run 2.3 to 2.7 times faster.
 
+## Notebooks
+
+Three short notebooks walk through the results. They read the shipped data, so they run in a minute or two.
+
+| Notebook | Contents |
+|---|---|
+| `notebooks/01_fisher_forecasts.ipynb` | FIONA's $F(w, y)$ against geometric optics, which part of $F$ each LISA and LIGO source probes, and the Fisher constraints and ellipses |
+| `notebooks/02_fiona_vs_glworia.ipynb` | The validation against `glworia` on C24's four benchmarks: lens posteriors, agreement across all 14 parameters, and run cost |
+| `notebooks/03_mass_scans.ipynb` | Inference for CIS, ULA and PBH lenses at $M_{Lz} = 3$ to $1000\,M_\odot$: what the data constrain as the lens mass grows |
+
 ## Repository layout
 
 ```
@@ -65,7 +76,8 @@ infer_with_FIONA/
 │   ├── 4_inference/            Bayesian inference drivers and posterior extraction
 │   └── 5_figures/              the paper's posterior figures
 ├── data/                       inputs the code needs (described below)
-├── results/posteriors/         posterior samples of every run in the paper
+├── notebooks/                  guided tours of the results
+├── results/                    posterior samples of every run, and run statistics
 ├── slurm/                      one Slurm script per entry point
 ├── glworia_comparison/         how the glworia reference runs were made
 └── outputs/                    everything the pipeline writes (git-ignored)
@@ -80,6 +92,7 @@ infer_with_FIONA/
 | `data/caustic_cis_ycrit.pkl` | `glworia`'s tabulated caustic $y_{\rm crit}(x_c)$, which defines the CIS prior mask. |
 | `data/table_validation_points.json` | The test lenses for the CIS table validation. |
 | `data/fisher_covariances.npz` | The Fisher covariances behind the two Fisher figures. |
+| `data/nufht_tables.cache` | Precomputed tables of the compiled NUFHT, which it otherwise regenerates in every process. |
 
 ### Outputs
 
@@ -210,10 +223,12 @@ By default, the figure scripts read the shipped samples in `results/posteriors/`
 
 ## Posterior samples
 
-`results/posteriors/` contains the equal-weight posterior samples of every run in the paper, as compressed NumPy archives.
+`results/posteriors/` contains the equal-weight posterior samples of every inference run, as compressed NumPy archives.
 
-- **`fiona/`** holds the four CIS benchmarks, the ULA run and the PBH run from this pipeline.
+- **`fiona/`** holds the four CIS benchmarks and the mass scans: CIS, ULA and PBH lenses at $M_{Lz} = 3, 10, 30, 100, 300$ and $1000\,M_\odot$, all with $y = 0.3$ and the same noise realization.
 - **`glworia/`** holds the four CIS benchmarks from `glworia`, run on identical data.
+
+`results/run_summary.json` lists each run's sampling time, number of likelihood evaluations and evidence.
 
 ```python
 from infer_with_fiona import posteriors

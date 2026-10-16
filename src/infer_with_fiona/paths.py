@@ -21,6 +21,10 @@ BGO_SWITCH['PBH'] = BGO_SWITCH['PointLens']
 CAUSTIC_PKL = DATA_DIR / 'caustic_cis_ycrit.pkl'        # glworia's tabulated y_crit(x_c)
 TABLE_VALIDATION_POINTS = DATA_DIR / 'table_validation_points.json'
 FISHER_COVARIANCES = DATA_DIR / 'fisher_covariances.npz'
+NUFHT_TABLES = DATA_DIR / 'nufht_tables.cache'                # asymptotic tables of the C NUFHT
+# The NUFHT extension otherwise looks for data/nufht_tables.cache in the working directory or its parent,
+# and regenerates (and prints) the tables when it finds none.
+os.environ.setdefault('NUFHT_TABLE_CACHE', str(NUFHT_TABLES))
 
 # shipped results
 RESULTS_DIR = REPO_ROOT / 'results'
