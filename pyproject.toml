@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "infer_with_fiona"
+version = "1.0.0"
+description = "Fisher forecasts and Bayesian inference for gravitational-wave lensing with the FIONA wave-optics solver"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Nino Ephremidze" },
+  { name = "Cora Dvorkin" },
+  { name = "Marc Kamionkowski" },
+]
+# Exact versions used for the paper are pinned in requirements.txt.
+dependencies = [
+  "numpy", "scipy", "numexpr", "psutil", "finufft",
+  "bilby", "dynesty", "lalsuite", "pycbc",
+  "matplotlib", "corner", "dill", "mpmath",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

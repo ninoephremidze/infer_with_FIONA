@@ -1,12 +1,11 @@
 __pycache__/
 *.pyc
-# Large outputs written by the pipeline
-fiona_w_table_cache/
-full_parameter_inference/
-glworia_repo/outdir/
-figures/
-# Slurm logs
-*.out
-*.err
+*.egg-info/
+build/
+# Everything the pipeline writes (tables, runs, figures, checks, logs)
+outputs/*
+!outputs/logs/
+outputs/logs/*
+!outputs/logs/.gitkeep
 # Temporary node-cache files
-fiona_gl_cache/*.tmp
+data/gl_rules/*.tmp
