@@ -69,16 +69,45 @@ def _make_lens_3p(lens_model, param3):
         raise ValueError(f"Unknown lens_model: {lens_model!r}")
 
 
+def _call_sorted_y(solver, w_vec, y_vec):
+    """Call a FIONA solver with the source positions in ascending order.
+
+    The NUFHT returns wrong values at some frequencies (errors up to ~0.1 in F
+    above w ~ 2) when its output radii w*y are not sorted, e.g. for the
+    finite-difference batch [y, y+eps, y-eps]. Sorting y before the call and
+    restoring the caller's order afterwards (last axis) avoids this.
+    """
+    y_vec = np.asarray(y_vec, dtype=float).ravel()
+    order = np.argsort(y_vec, kind='stable')
+    F_sorted = solver(w_vec, y_vec[order])
+    F = np.empty_like(F_sorted)
+    F[..., order] = F_sorted
+    return F
+
+
+class _SortedYSolver:
+    """FIONA solver wrapper that always passes sorted y (see _call_sorted_y)."""
+
+    def __init__(self, solver):
+        self._solver = solver
+
+    def __call__(self, w_vec, y_vec):
+        return _call_sorted_y(self._solver, w_vec, y_vec)
+
+
 def _make_solver(lens, gl_dir, n_workers):
-    """Create a FresnelNUFHTBatched solver, patching the fiona.utils GL dir."""
+    """Create a FresnelNUFHTBatched solver, patching the fiona.utils GL dir.
+
+    The solver is wrapped so that it is always called with sorted y.
+    """
     _fiona_utils._FIONA_GL2D_DIR = gl_dir
     os.environ["FIONA_GL2D_DIR"] = gl_dir
-    return FresnelNUFHTBatched(
+    return _SortedYSolver(FresnelNUFHTBatched(
         lens,
         gl_dir=gl_dir,
         n_workers=n_workers,
         print_timing=False,
-    )
+    ))
 
 
 def compute_F(M_Lz_Msun, y_vec, x_c, f_vec,
@@ -127,7 +156,9 @@ def compute_F_and_derivatives(
     eps_logM=0.01,
     eps_y=0.01,
     eps_xc=None,
-    w_high=100.0,
+    w_high=None,
+    bgo_switch='measured',
+    w_valid=254.0,
 ):
     """
     Evaluate F(w, y) and its derivatives w.r.t. {log M_Lz, y, x_c}.
@@ -159,15 +190,29 @@ def compute_F_and_derivatives(
         Finite-diff step in y (default 0.01; applied additively).
     eps_xc : float or None
         Finite-diff step in x_c. Defaults to max(0.001, 0.1 * x_c).
-    w_high : float
-        Dimensionless frequency threshold above which bGO analytic derivatives
-        replace FIONA finite differences (CIS only).  Tambalo+2023 uses
-        w_high ~ 100.  Set to np.inf to disable bGO entirely.
+    w_high : ignored
+        Kept for backward compatibility. The FIONA -> bGO transition is now set by
+        ``bgo_switch`` (see below), not by a fixed frequency.
+    bgo_switch : 'measured' or None
+        CIS only. 'measured' (default): above the lens-dependent frequency w_s(x_c, y) at
+        which the bGO sum agrees with converged FIONA to 1e-3 (data/bgo_switch/cis.npz, the
+        map the inference pipeline uses), F and ALL its derivatives come from the bGO sum,
+        blended smoothly over w_s <= w <= 1.2 w_s. None: FIONA at every frequency.
+    w_valid : float
+        Highest w at which FIONA's quadrature schedule is validated (254 for the converged
+        `cis` schedule). A ValueError is raised if FIONA would be needed above it, i.e.
+        where the bGO sum is not accurate and FIONA is not validated.
+
+    Notes
+    -----
+    F and its derivatives are returned referenced to the first-arriving image,
+    F_T = F_FIONA exp(-i w phi_m), with the derivatives of phi_m(y, x_c) and of w included
+    (T23's convention). Callers must NOT apply that conversion again.
 
     Returns
     -------
     F : ndarray, complex, shape (n_f, n_y)
-        Amplification factor at (f_i, y_j).
+        Amplification factor at (f_i, y_j), referenced to the first-arriving image.
     dF_dlogM : ndarray, complex, shape (n_f, n_y)
         ∂F / ∂ log M_Lz
     dF_dy : ndarray, complex, shape (n_f, n_y)
@@ -178,107 +223,89 @@ def compute_F_and_derivatives(
     gl_dir = gl_dir or _DEFAULT_GL_DIR
     y_vec = np.asarray(y_vec, dtype=float)
     f_vec = np.asarray(f_vec, dtype=float)
-    n_y = len(y_vec)
-
+    n_y, n_f = len(y_vec), len(f_vec)
     if eps_xc is None:
         eps_xc = max(5e-6, 5e-4 * float(x_c))
 
     w_base = 8.0 * np.pi * G_over_c3_Msun * float(M_Lz_Msun) * f_vec
-    w_p    = w_base * np.exp(+eps_logM)
-    w_m    = w_base * np.exp(-eps_logM)
 
-    # ------------------------------------------------------------------ #
-    # One solver for the base lens — reused for all three w-grid calls.   #
-    # ------------------------------------------------------------------ #
-    solver_base = _make_solver(_make_lens(lens_model, x_c), gl_dir, n_workers)
-
-    # Base call: y, y+eps_y, y-eps_y batched into one evaluation.
-    y_batch = np.concatenate([y_vec, y_vec + eps_y, y_vec - eps_y])
-    F_batch = solver_base(w_base, y_batch)   # shape (n_f, 3*n_y)
-
-    F    = F_batch[:, :n_y]
-    F_yp = F_batch[:, n_y: 2 * n_y]
-    F_ym = F_batch[:, 2 * n_y:]
-    dF_dy = (F_yp - F_ym) / (2.0 * eps_y)
-
-    # log M_Lz derivative: same lens, shifted w grids.
-    F_Mp = solver_base(w_p, y_vec)
-    F_Mm = solver_base(w_m, y_vec)
-    dF_dlogM = (F_Mp - F_Mm) / (2.0 * eps_logM)
-
-    # ------------------------------------------------------------------ #
-    # Two separate solvers for x_c perturbations (different lens shape).  #
-    # ------------------------------------------------------------------ #
-    solver_xcp = _make_solver(_make_lens(lens_model, float(x_c) + eps_xc), gl_dir, n_workers)
-    solver_xcm = _make_solver(_make_lens(lens_model, float(x_c) - eps_xc), gl_dir, n_workers)
-
-    F_xcp = solver_xcp(w_base, y_vec)
-    F_xcm = solver_xcm(w_base, y_vec)
-    dF_dxc = (F_xcp - F_xcm) / (2.0 * eps_xc)
-
-    # ------------------------------------------------------------------ #
-    # bGO override for CIS at high dimensionless frequencies (w > w_high) #
-    # ------------------------------------------------------------------ #
-    if lens_model == 'CIS' and np.isfinite(w_high) and np.any(w_base > w_high):
-        from .cis_go import cis_dF_bGO
-        hi_mask = w_base > w_high       # shape (n_f,)
-        w_hi = w_base[hi_mask]          # subset of w values in bGO regime
+    # ---- bGO weight b(w) per source position (0: FIONA, 1: bGO), fixed by the fiducial lens ---- #
+    b = np.zeros((n_f, n_y))
+    db_dlogw = np.zeros((n_f, n_y))
+    if lens_model == 'CIS' and bgo_switch == 'measured':
+        from ..paths import BGO_SWITCH
+        from ..table import BgoSwitch
+        switch = BgoSwitch(str(BGO_SWITCH['CIS']))
+        h = 1e-6
         for i_y, y_val in enumerate(y_vec):
-            dlogw, dy, dxc = cis_dF_bGO(w_hi, float(y_val), float(x_c))
-            dF_dlogM[hi_mask, i_y] = dlogw
-            dF_dy   [hi_mask, i_y] = dy
-            dF_dxc  [hi_mask, i_y] = dxc
+            b[:, i_y] = switch.weight(w_base, float(x_c), float(y_val))
+            db_dlogw[:, i_y] = (switch.weight(w_base * np.exp(h), float(x_c), float(y_val))
+                                - switch.weight(w_base * np.exp(-h), float(x_c), float(y_val))) / (2 * h)
+    elif bgo_switch not in ('measured', None):
+        raise ValueError(f'unknown bgo_switch {bgo_switch!r}')
 
-    # ------------------------------------------------------------------ #
-    # Tambalo normalization correction for CIS                            #
-    # ------------------------------------------------------------------ #
-    # FIONA returns F_full(w,y) which includes the absolute Fermat phase  #
-    # exp(iw φ_m) of the minimum image.  Tambalo's contour-method and     #
-    # time-domain finite differences use F_T = F_full * exp(-iw φ_m),    #
-    # which normalizes the minimum time delay to zero.  This subtraction  #
-    # is physically required because the absolute arrival time of the      #
-    # minimum image is degenerate with the (unknown) coalescence time t_c. #
-    #                                                                      #
-    # When Tambalo computes dF_T/dθ via finite differences, they get:     #
-    #   dF_T/dy     = (dF_full/dy   + iw α_min       F_full) exp(-iw φ_m) #
-    #   dF_T/dlogM  = (dF_full/dlogM - iw φ_m        F_full) exp(-iw φ_m) #
-    #   dF_T/dxc    = (dF_full/dxc  - iw ψ_min_xc   F_full) exp(-iw φ_m) #
-    # where α_min = -∂φ_m/∂y and ψ_min_xc = ∂φ_m/∂xc.                  #
-    #                                                                      #
-    # In Fisher matrix elements the exp(-iw φ_m) phase factors cancel, so #
-    # the effective correction to apply to FIONA's derivatives is:         #
-    #   dF_dy   += +iw_base * α_min     * F  (per y_val column)           #
-    #   dF_dlogM-=  iw_base * φ_m       * F                               #
-    #   dF_dxc  -=  iw_base * ψ_min_xc  * F                               #
-    # ------------------------------------------------------------------ #
+    need_fiona = np.any(b < 1.0, axis=1)                 # frequencies where FIONA contributes
+    if np.any(need_fiona & (w_base * np.exp(eps_logM) > w_valid)):
+        bad = w_base[need_fiona & (w_base * np.exp(eps_logM) > w_valid)]
+        raise ValueError(
+            f'FIONA would be needed at w up to {bad.max():.4g}, above its validated range w <= {w_valid:g}, '
+            f'and the bGO sum is not accurate there for x_c = {x_c:g} (w_s = inf). Choose a lighter lens or '
+            f'a lower-frequency source.')
+
+    F = np.zeros((n_f, n_y), dtype=complex)
+    dF_dlogM = np.zeros_like(F); dF_dy = np.zeros_like(F); dF_dxc = np.zeros_like(F)
+
+    # ---- FIONA part: central finite differences (absolute Fermat phase) ---- #
+    Ff = np.zeros_like(F); dLf = np.zeros_like(F); dyf = np.zeros_like(F); dxf = np.zeros_like(F)
+    if need_fiona.any():
+        wk = w_base[need_fiona]
+        solver_base = _make_solver(_make_lens(lens_model, x_c), gl_dir, n_workers)
+        F_batch = solver_base(wk, np.concatenate([y_vec, y_vec + eps_y, y_vec - eps_y]))
+        Ff[need_fiona] = F_batch[:, :n_y]
+        dyf[need_fiona] = (F_batch[:, n_y:2 * n_y] - F_batch[:, 2 * n_y:]) / (2.0 * eps_y)
+        dLf[need_fiona] = (solver_base(wk * np.exp(eps_logM), y_vec)
+                           - solver_base(wk * np.exp(-eps_logM), y_vec)) / (2.0 * eps_logM)
+        solver_xcp = _make_solver(_make_lens(lens_model, float(x_c) + eps_xc), gl_dir, n_workers)
+        solver_xcm = _make_solver(_make_lens(lens_model, float(x_c) - eps_xc), gl_dir, n_workers)
+        dxf[need_fiona] = (solver_xcp(wk, y_vec) - solver_xcm(wk, y_vec)) / (2.0 * eps_xc)
+
+    # ---- bGO part (CIS): closed-form F and analytic derivatives, same absolute phase convention ---- #
+    Fg = np.zeros_like(F); dLg = np.zeros_like(F); dyg = np.zeros_like(F); dxg = np.zeros_like(F)
+    if np.any(b > 0.0):
+        from .cis_go import cis_F_bGO, cis_dF_bGO
+        for i_y, y_val in enumerate(y_vec):
+            hi = b[:, i_y] > 0.0
+            if hi.any():
+                Fg[hi, i_y] = cis_F_bGO(w_base[hi], float(y_val), float(x_c))
+                dLg[hi, i_y], dyg[hi, i_y], dxg[hi, i_y] = cis_dF_bGO(w_base[hi], float(y_val), float(x_c))
+
+    # ---- consistent blend: the same weight multiplies F and every derivative ---- #
+    F = (1.0 - b) * Ff + b * Fg
+    dF_dy = (1.0 - b) * dyf + b * dyg
+    dF_dxc = (1.0 - b) * dxf + b * dxg
+    dF_dlogM = (1.0 - b) * dLf + b * dLg + db_dlogw * (Fg - Ff)      # b depends on w, hence on M_Lz
+
+    # ---- reference to the first-arriving image (T23's convention), F and derivatives alike ---- #
     if lens_model == 'CIS':
         from .cis_go import cis_images, cis_image_props, _alpha
-
         for i_y, y_val in enumerate(y_vec):
-            y_val = float(y_val)
-            xc_val = float(x_c)
-
-            # Find minimum image (Morse index 0, largest positive x root)
-            images = cis_images(y_val, xc_val)
-            x_min = max(images)   # minimum Fermat potential image
-
-            # Minimum Fermat potential φ_m and deflection angle α_min
+            y_val, xc_val = float(y_val), float(x_c)
+            x_min = max(cis_images(y_val, xc_val))                      # first-arriving image
             phi_m, _, _, _ = cis_image_props(x_min, y_val, xc_val)
-            alpha_min = _alpha(x_min, xc_val)   # = -∂φ_m/∂y
-
-            # ψ_min_xc = ∂φ_m/∂xc via finite difference (x_min held fixed;
-            # stationarity kills ∂x_min/∂xc contribution at leading order)
+            alpha_min = _alpha(x_min, xc_val)                           # = -d phi_m / d y
             eps_phi = max(1e-7, 1e-5 * xc_val)
             phi_xcp, _, _, _ = cis_image_props(x_min, y_val, xc_val + eps_phi)
             phi_xcm, _, _, _ = cis_image_props(x_min, y_val, xc_val - eps_phi)
-            psi_min_xc = (phi_xcp - phi_xcm) / (2.0 * eps_phi)
-
-            F_col = F[:, i_y]   # shape (n_f,)
-
-            # Apply corrections: match Tambalo's φ_m-subtracted convention
-            dF_dy   [:, i_y] += 1j * w_base * alpha_min   * F_col
-            dF_dlogM[:, i_y] -= 1j * w_base * phi_m       * F_col
-            dF_dxc  [:, i_y] -= 1j * w_base * psi_min_xc  * F_col
+            dphi_dxc = (phi_xcp - phi_xcm) / (2.0 * eps_phi)
+            Fc = F[:, i_y].copy()
+            dF_dy[:, i_y] += 1j * w_base * alpha_min * Fc
+            dF_dlogM[:, i_y] -= 1j * w_base * phi_m * Fc
+            dF_dxc[:, i_y] -= 1j * w_base * dphi_dxc * Fc
+            ph = np.exp(-1j * w_base * phi_m)
+            F[:, i_y] *= ph
+            dF_dy[:, i_y] *= ph
+            dF_dlogM[:, i_y] *= ph
+            dF_dxc[:, i_y] *= ph
 
     return F, dF_dlogM, dF_dy, dF_dxc
 
@@ -437,4 +464,4 @@ def compute_F_param_batch(M_Lz_Msun, y_vec, param3_vec, f_vec, lens_model,
         n_workers=n_workers,
         print_timing=False,
     )
-    return solver(w_vec, np.asarray(y_vec))  # shape (n_w, n_p3, n_y)
+    return _call_sorted_y(solver, w_vec, y_vec)  # shape (n_w, n_p3, n_y)

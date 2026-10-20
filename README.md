@@ -153,7 +153,7 @@ python scripts/1_fisher/fisher_forecasts.py plot      # fisher_lisa.png, fisher_
 python scripts/1_fisher/fisher_forecasts.py compute   # rerun the Fisher matrices with FIONA
 ```
 
-The lens is a CIS at $M_{Lz} = 10^5\,M_\odot$, $y = 0.3$ and $x_c = 0.01$. LISA forecasts are normalized to SNR $10^3$ and LIGO forecasts to SNR $10^2$. As in Tambalo et al. (2023), $F$ is referenced to the first-arriving image, so a lens-dependent overall time shift does not count as information about the lens. `plot` reproduces the paper's figures exactly, and `compute` reproduces the shipped covariances exactly.
+The lens is a CIS with $y = 0.3$ and $x_c = 0.01$. Each source is paired with the lens mass at which $w = 10$ at $f_*$, the frequency below which 90% of its unlensed SNR$^2$ accumulates (`--w-star`), so that its band covers the wave-optics regime $w \sim 1$. $F$ and its derivatives come from FIONA with the converged `cis` schedule, blended into the beyond-geometric-optics sum above the measured switch frequency $w_s(x_c, y)$, with the same weight on $F$ and every derivative. LISA forecasts are normalized to SNR $10^3$ and LIGO forecasts to SNR $10^2$. As in Tambalo et al. (2023), $F$ is referenced to the first-arriving image, so a lens-dependent overall time shift does not count as information about the lens. `plot` reproduces the paper's figures exactly, and `compute` reproduces the shipped covariances exactly.
 
 ### 2. Quadrature schedule and bGO switch
 

@@ -34,7 +34,6 @@ def run_fisher(
     psd_func=None,
     f_min=None,
     f_max=None,
-    w_high=100.0,
 ):
     """
     Run Fisher forecasts for GW lensing by a CIS lens observed with LISA.
@@ -78,10 +77,10 @@ def run_fisher(
         If provided, called as waveform_func(f_vec) and must return |h_0(f)|
         as a real ndarray with the same shape as f_vec.  When None (default)
         the built-in SPA inspiral amplitude is used.
-    w_high : float
-        bGO threshold: for CIS lens, derivatives at w > w_high are computed
-        with the analytic bGO formula instead of FIONA finite differences.
-        Default 100.0 (per Tambalo+2023).  Set to np.inf to disable.
+
+    F and all derivatives come from compute_F_and_derivatives, which blends
+    FIONA into the bGO sum above the measured, lens-dependent switch w_s(x_c, y)
+    and references F to the first-arriving image.
 
     Returns
     -------
@@ -151,7 +150,6 @@ def run_fisher(
             eps_logM=eps_logM,
             eps_y=eps_y,
             eps_xc=eps_xc,
-            w_high=w_high,
         )
         # F, dF_* all have shape (n_f, n_y)
 

@@ -3,8 +3,8 @@ CIS lens geometric optics (GO) and beyond-GO (bGO) amplification factor
 and its parameter derivatives.
 
 Reference: Tambalo+2023, Eq. 1907 (general bGO derivative) and
-Eqs. 1922-1923 (logM derivative).  Used as drop-in replacements for the
-FIONA finite-difference derivatives at frequencies w > w_high ~ 100.
+Eqs. 1922-1923 (logM derivative).  compute_F_and_derivatives blends F and its
+derivatives from FIONA into these above the measured switch frequency w_s(x_c, y).
 """
 import numpy as np
 from scipy.optimize import brentq
