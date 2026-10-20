@@ -55,7 +55,7 @@ Three short notebooks walk through the results. They read the shipped data, so t
 | `notebooks/01_fisher_forecasts.ipynb` | FIONA's $F(w, y)$ against geometric optics, which part of $F$ each LISA and LIGO source probes, and the Fisher constraints and ellipses |
 | `notebooks/02_fiona_vs_glworia.ipynb` | The validation against `glworia` on C24's four benchmarks: lens posteriors, agreement across all 14 parameters, and run cost |
 | `notebooks/03_mass_scans.ipynb` | Inference for CIS, ULA and PBH lenses at $M_{Lz} = 3$ to $1000\,M_\odot$: what the data constrain as the lens mass grows |
-| `notebooks/04_core_size_calibration.ipynb` | Fisher forecasts of the core size $x_c$ against the mass-scan posteriors, with the Fisher Gaussian restricted to the inference prior, and the SIDM cross-section bound along the mass scan |
+| `notebooks/04_core_size_calibration.ipynb` | Fisher forecasts of the core size $x_c$ against the mass-scan posteriors, with the Fisher Gaussian restricted to the inference prior, and the SIDM cross-section bounds along the mass scan, with the lens redshift marginalized as in Tambalo et al. (2023), compared with other SIDM probes |
 
 ## Repository layout
 
@@ -215,6 +215,7 @@ Results go to `outputs/runs/`. Runs checkpoint automatically, and resubmitting t
 | Fisher forecasts for LISA and LIGO | `scripts/1_fisher/fisher_forecasts.py plot` |
 | Fisher vs inference width of the core size | `notebooks/04_core_size_calibration.ipynb` |
 | SIDM cross-section posteriors along the CIS mass scan | `notebooks/04_core_size_calibration.ipynb` |
+| SIDM limits against other probes | `notebooks/04_core_size_calibration.ipynb` |
 | CIS lens-parameter posteriors, this pipeline vs `glworia` | `scripts/5_figures/plot_cis_lens_corners.py` |
 | PBH and ULA lens-parameter posteriors | `scripts/5_figures/plot_ula_pbh_corners.py` |
 | Full 14-parameter CIS posteriors (appendix) | `scripts/5_figures/plot_cis_full_corners.py` |

@@ -17,7 +17,7 @@ authors = [
 dependencies = [
   "numpy", "scipy", "numexpr", "psutil", "finufft",
   "bilby", "dynesty", "lalsuite", "pycbc",
-  "matplotlib", "corner", "dill", "mpmath",
+  "matplotlib", "corner", "dill", "mpmath", "colossus",
 ]
 
 [tool.setuptools.packages.find]
