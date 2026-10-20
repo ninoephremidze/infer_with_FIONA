@@ -94,6 +94,7 @@ infer_with_FIONA/
 | `data/table_validation_points.json` | The test lenses for the CIS table validation. |
 | `data/fisher_covariances.npz` | The Fisher covariances behind the two Fisher figures, with $F$ referenced to the first image. |
 | `data/core_fisher_LIGO_CIS.npz` | Fisher grid of $(\ln M_{Lz}, y, x_c)$ over core size, lens mass and source position for the LIGO inference benchmark, used by notebook 04. |
+| `data/core_fisher_LISA_mbbh{1e4,1e6}_CIS.npz` | The same Fisher grid for two LISA sources at $z_S = 3$ ($10^4+10^4$ and $10^6+10^6\,M_\odot$, last month before merger, native SNR), used by notebook 04. |
 | `data/nufht_tables.cache` | Precomputed tables of the compiled NUFHT, which it otherwise regenerates in every process. |
 
 ### Outputs
@@ -216,6 +217,7 @@ Results go to `outputs/runs/`. Runs checkpoint automatically, and resubmitting t
 | Fisher vs inference width of the core size | `notebooks/04_core_size_calibration.ipynb` |
 | SIDM cross-section posteriors along the CIS mass scan | `notebooks/04_core_size_calibration.ipynb` |
 | SIDM limits against other probes | `notebooks/04_core_size_calibration.ipynb` |
+| Ultralight-axion mass limits from the CIS core | `notebooks/04_core_size_calibration.ipynb` |
 | CIS lens-parameter posteriors, this pipeline vs `glworia` | `scripts/5_figures/plot_cis_lens_corners.py` |
 | PBH and ULA lens-parameter posteriors | `scripts/5_figures/plot_ula_pbh_corners.py` |
 | Full 14-parameter CIS posteriors (appendix) | `scripts/5_figures/plot_cis_full_corners.py` |
