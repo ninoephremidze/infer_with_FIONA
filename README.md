@@ -62,7 +62,7 @@ Three short notebooks walk through the results. They read the shipped data, so t
 infer_with_FIONA/
 ├── src/infer_with_fiona/       the installable package
 │   ├── fiona/                  the FIONA solver, in the exact version used for the paper
-│   ├── fisher/                 Fisher-matrix tools: waveforms, noise curves, derivatives of F, image solvers
+│   ├── fisher/                 Fisher-matrix tools: waveforms, noise curves, derivatives of F, image solvers, plots
 │   ├── quadrature/             Gauss-Legendre node schedules n(w) and the node cache
 │   ├── table.py                the F(x_c, y, w) table, GO residual, bGO switch and caustic prior mask
 │   ├── amplification.py        HybridF: the F used in the likelihood, with the LAL and time conventions
@@ -91,7 +91,7 @@ infer_with_FIONA/
 | `data/bgo_switch/{cis,ula,pbh}.npz` | The measured bGO switch maps $w_s$ for each lens. |
 | `data/caustic_cis_ycrit.pkl` | `glworia`'s tabulated caustic $y_{\rm crit}(x_c)$, which defines the CIS prior mask. |
 | `data/table_validation_points.json` | The test lenses for the CIS table validation. |
-| `data/fisher_covariances.npz` | The Fisher covariances behind the two Fisher figures. |
+| `data/fisher_covariances.npz` | The Fisher covariances behind the two Fisher figures, with $F$ referenced to the first image. |
 | `data/nufht_tables.cache` | Precomputed tables of the compiled NUFHT, which it otherwise regenerates in every process. |
 
 ### Outputs
@@ -149,11 +149,11 @@ The commands below are run from the repository root.
 ### 1. Fisher forecasts
 
 ```bash
-python scripts/1_fisher/fisher_forecasts.py plot      # LISA_fisher.png, LIGO_fisher.png from the shipped covariances
+python scripts/1_fisher/fisher_forecasts.py plot      # fisher_lisa.png, fisher_ligo.png from the shipped covariances
 python scripts/1_fisher/fisher_forecasts.py compute   # rerun the Fisher matrices with FIONA
 ```
 
-The lens is a CIS at $M_{Lz} = 10^5\,M_\odot$, $y = 0.3$ and $x_c = 0.01$. LISA forecasts are normalized to SNR $10^3$ and LIGO forecasts to SNR $10^2$.
+The lens is a CIS at $M_{Lz} = 10^5\,M_\odot$, $y = 0.3$ and $x_c = 0.01$. LISA forecasts are normalized to SNR $10^3$ and LIGO forecasts to SNR $10^2$. As in Tambalo et al. (2023), $F$ is referenced to the first-arriving image, so a lens-dependent overall time shift does not count as information about the lens. `plot` reproduces the paper's figures exactly, and `compute` reproduces the shipped covariances exactly.
 
 ### 2. Quadrature schedule and bGO switch
 

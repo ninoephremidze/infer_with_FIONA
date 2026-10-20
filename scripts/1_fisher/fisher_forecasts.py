@@ -4,20 +4,21 @@ for a CIS lens at M_Lz = 1e5 Msun, y = 0.3, x_c = 0.01. LISA sources are three S
 normalized to SNR 1e3. LIGO sources are five compact binaries at z_s = 0.1 with the aLIGO O4 design
 sensitivity, normalized to SNR 1e2.
 
-  python scripts/1_fisher/fisher_forecasts.py compute       # Fisher runs -> data/fisher_covariances.npz
-  python scripts/1_fisher/fisher_forecasts.py plot          # LISA_fisher.png, LIGO_fisher.png -> outputs/figures
-  python scripts/1_fisher/fisher_forecasts.py compute-ref   # three time-reference conventions -> outputs/checks
-  python scripts/1_fisher/fisher_forecasts.py plot-ref      # figures + table for each convention
+  python scripts/1_fisher/fisher_forecasts.py plot       # fisher_lisa.png, fisher_ligo.png -> outputs/figures
+  python scripts/1_fisher/fisher_forecasts.py compute    # rerun the Fisher matrices with FIONA
+  python scripts/1_fisher/fisher_forecasts.py plot-ref   # figures for all three time-reference conventions
 
-`plot` needs only the shipped covariances, so it runs in seconds. `compute` reruns the Fisher matrices
-with FIONA and overwrites data/fisher_covariances.npz.
+`plot` needs only data/fisher_covariances.npz, so it runs in seconds and reproduces the paper's figures
+exactly. `compute` recomputes the covariances with FIONA, overwrites that file, and also writes all three
+conventions below to outputs/checks/fisher_time_reference.npz.
 
-compute-ref: FIONA's F carries the shape- and y-dependent phase e^{i w phi_min(x_c, y)} of the first image. The
-published figures (A) use it as is, with no arrival-time parameter, so that pure time shift counts as lens
-information. C removes it (min-image reference, T23's convention); D also adds the arrival time t_c, as PE
-marginalizes over it. The CIS derivatives from infer_with_fiona.fisher (FIONA + bGO above w = 100) are converted
-exactly: F_min = F e^{-i w phi}, dF_min/dtheta = (dF/dtheta - i w F dphi/dtheta) e^{-i w phi}, with
-dphi/d(ln M) = phi (w is proportional to M) and dphi/dy, dphi/dx_c by central differences of phi_min.
+Time reference. FIONA's F carries the shape- and y-dependent phase e^{i w phi_min(x_c, y)} of the first image,
+i.e. a lens-dependent overall time shift. The paper uses convention C, which removes it (F referenced to the
+first-arriving image, as in T23), so that a pure time shift is not counted as information about the lens.
+A keeps the shift, and D also adds the arrival time as a Fisher parameter. The derivatives from
+infer_with_fiona.fisher (FIONA + bGO above w = 100) are converted exactly:
+F_min = F e^{-i w phi}, dF_min/dtheta = (dF/dtheta - i w F dphi/dtheta) e^{-i w phi}, with dphi/d(ln M) = phi
+(w is proportional to M) and dphi/dy, dphi/dx_c by central differences of phi_min.
 """
 import argparse
 import os
@@ -27,7 +28,7 @@ import numpy as np
 from infer_with_fiona import paths
 
 ap = argparse.ArgumentParser()
-ap.add_argument('mode', choices=['compute', 'plot', 'compute-ref', 'plot-ref'])
+ap.add_argument('mode', choices=['compute', 'plot', 'plot-ref'])
 ap.add_argument('--snr-ligo', type=float, default=100.0, help='LIGO normalization SNR (caption: 100)')
 ap.add_argument('--snr-lisa', type=float, default=1e3)
 ap.add_argument('--out-dir', default=str(paths.FIGURES_DIR))
@@ -54,108 +55,13 @@ LIGO_SOURCES = [  # name, m1, m2, label, colour, pycbc delta_f
 ]
 
 
-def compute():
-    import finufft  # noqa: F401 -- before fiona
-    from pycbc.waveform import get_fd_waveform
-    from infer_with_fiona.fisher import run_fisher, lisa_psd, ligo_o4_psd, f_isco, f_1month, luminosity_distance
-
-    n_workers = int(os.environ.get('SLURM_CPUS_ON_NODE', 8))
-    out = {}
-    for det, sources, z_s, psd, fmin, fmax in [('LISA', LISA_SOURCES, 3.0, lisa_psd, 1e-4, 1.0),
-                                               ('LIGO', LIGO_SOURCES, 0.1, ligo_o4_psd, 10.0, 1000.0)]:
-        D_L = luminosity_distance(z_s)
-        for src in sources:
-            name, m1, m2 = src[:3]
-            dfreq = src[5] if det == 'LIGO' else 1e-7
-            M_tot, eta = m1 + m2, m1 * m2 / (m1 + m2) ** 2
-            f_lo, f_hi = max(f_1month(M_tot, eta, z_s), fmin), min(f_isco(M_tot, z_s), fmax)
-            if f_hi < fmin:
-                print(f'{det} {name}: skipped (f_ISCO {f_hi:.2e} Hz below band)')
-                continue
-            hp, _ = get_fd_waveform(approximant='IMRPhenomD', mass1=float(m1 * (1 + z_s)),
-                                    mass2=float(m2 * (1 + z_s)), f_lower=float(f_lo), delta_f=float(dfreq),
-                                    distance=float(D_L))
-            fp, hpa = hp.sample_frequencies.numpy(), np.abs(hp.numpy())
-
-            def wfunc(f, fp=fp, hpa=hpa, lo=f_lo, hi=f_hi):
-                h = np.interp(f, fp, hpa, left=0., right=0.)
-                h[(f < lo) | (f > hi)] = 0.
-                return h
-
-            res = run_fisher(M_Lz_Msun=np.array([M_LZ]), y=np.array([Y_FID]), x_c=XC_FID, m1_Msun=m1, m2_Msun=m2,
-                             z_s=z_s, lens_model='CIS', n_f=256, n_workers=n_workers, return_cov=True,
-                             waveform_func=wfunc, psd_func=psd, f_min=fmin, f_max=fmax)
-            out[f'{det}_{name}_cov'] = res['cov'][0, 0]
-            out[f'{det}_{name}_snr'] = res['SNR'][0, 0]
-            print(f'{det} {name}: SNR {res["SNR"][0, 0]:.3g}, raw sigma = {np.sqrt(np.diag(res["cov"][0, 0]))}',
-                  flush=True)
-    np.savez(CACHE, **out)
-    print(f'wrote {CACHE}')
-
-
-def draw_ellipse(ax, cov2, center, color, levels=(0.68, 0.95), alphas=(0.35, 0.12), lw=1.4):
-    from matplotlib.patches import Ellipse
-    chi2 = {0.68: 2.30, 0.95: 5.99}
-    ev, evec = np.linalg.eigh(cov2)
-    angle = np.degrees(np.arctan2(evec[1, -1], evec[0, -1]))
-    for level, alpha in zip(levels, alphas):
-        s = np.sqrt(chi2[level])
-        ax.add_patch(Ellipse(xy=center, width=2 * s * np.sqrt(abs(ev[-1])), height=2 * s * np.sqrt(abs(ev[-2])),
-                             angle=angle, facecolor=color, alpha=alpha, linewidth=0))
-    s = np.sqrt(chi2[0.68])
-    ax.add_patch(Ellipse(xy=center, width=2 * s * np.sqrt(abs(ev[-1])), height=2 * s * np.sqrt(abs(ev[-2])),
-                         angle=angle, facecolor='none', edgecolor=color, linewidth=lw))
-
-
 def corner_fig(covs, labels, colors, fname):
-    """Publication corner plot, as in cells 41 (LISA) / 34 (LIGO) of the original notebooks."""
+    """The paper's corner plot (infer_with_fiona.fisher.plotting), saved to fname."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    import matplotlib.ticker as ticker
-    from matplotlib.lines import Line2D
-    matplotlib.rcParams.update({'font.size': 12, 'figure.dpi': 110})
-
-    plabels = [r'$\Delta\log M_{Lz}$', r'$y$', r'$x_c$']
-    pfid = [0.0, Y_FID, XC_FID]
-    n = 3
-    max_sig = np.array([max(np.sqrt(abs(c[k, k])) for c in covs) for k in range(n)])
-    half = 1.5 * np.sqrt(5.99) * max_sig
-    lims = [(pfid[k] - half[k], pfid[k] + half[k]) for k in range(n)]
-    fig, axes = plt.subplots(n, n, figsize=(6.8, 6.8))
-    fig.subplots_adjust(hspace=0.08, wspace=0.08)
-    for row in range(n):
-        for col in range(n):
-            ax = axes[row, col]
-            if col > row:
-                ax.set_visible(False)
-                continue
-            if col == row:
-                x = np.linspace(*lims[col], 500)
-                for cov, c in zip(covs, colors):
-                    sig = np.sqrt(abs(cov[row, row]))
-                    ax.plot(x, np.exp(-0.5 * ((x - pfid[row]) / sig) ** 2), color=c, lw=1.8)
-                ax.set_xlim(lims[col]); ax.set_ylim(0, 1.15); ax.set_yticks([])
-            else:
-                for cov, c in zip(covs, colors):
-                    draw_ellipse(ax, cov[np.ix_([col, row], [col, row])], (pfid[col], pfid[row]), c)
-                ax.set_xlim(lims[col]); ax.set_ylim(lims[row])
-            ax.xaxis.set_major_locator(ticker.MaxNLocator(3, prune='both'))
-            if row != col:
-                ax.yaxis.set_major_locator(ticker.MaxNLocator(3, prune='both'))
-            ax.tick_params(labelsize=10, length=3, width=0.7)
-            if row == n - 1:
-                ax.set_xlabel(plabels[col], fontsize=13)
-            else:
-                ax.tick_params(labelbottom=False)
-            if col == 0 and row > 0:
-                ax.set_ylabel(plabels[row], fontsize=13)
-            elif col > 0:
-                ax.tick_params(labelleft=False)
-    fig.legend(handles=[Line2D([0], [0], color=c, lw=2.2, label=l) for l, c in zip(labels, colors)],
-               loc='upper right', bbox_to_anchor=(0.95, 0.93), fontsize=11, framealpha=0.9, handlelength=1.6)
-    fig.savefig(fname, bbox_inches='tight', dpi=300)
-    plt.close(fig)
+    from infer_with_fiona.fisher.plotting import corner_fig as _corner_fig
+    plt.close(_corner_fig(covs, labels, colors, (Y_FID, XC_FID), fname))
     print(f'wrote {fname}')
 
 
@@ -170,7 +76,7 @@ def plot():
             covs.append(d[f'{det}_{name}_cov'] * (float(d[f'{det}_{name}_snr']) / snr_fid) ** 2)
             labels.append(label); colors.append(color)
             print(f'{det} {name}: sigma at SNR {snr_fid:g} = {np.sqrt(np.diag(covs[-1]))}')
-        corner_fig(covs, labels, colors, os.path.join(args.out_dir, f'{det}_fisher{args.suffix}.png'))
+        corner_fig(covs, labels, colors, os.path.join(args.out_dir, f'fisher_{det.lower()}{args.suffix}.png'))
 
 
 def compute_ref():
@@ -227,7 +133,10 @@ def compute_ref():
             print(f'{det} {name:9s} raw sigma(lnM, y, x_c):  A {sn("A")}  C {sn("C")}  D {sn("D")}', flush=True)
     os.makedirs(os.path.dirname(REF), exist_ok=True)
     np.savez(REF, **out)
-    print(f'wrote {REF}')
+    print(f'wrote {REF} (all three conventions)')
+    paper = {k[2:]: v for k, v in out.items() if k.startswith('C_')}      # minimum-image reference, as in T23
+    np.savez(CACHE, **paper)
+    print(f'wrote {CACHE} (minimum-image reference: the covariances behind the paper figures)')
 
 
 def plot_ref():
@@ -246,11 +155,11 @@ def plot_ref():
             corner_fig(covs, labels, colors, os.path.join(REF_FIGS, f'{det}_fisher_{tag}.png'))
 
 
-if args.mode == 'compute-ref':
+if args.mode == 'compute':
     compute_ref()
 elif args.mode == 'plot-ref':
     os.makedirs(REF_FIGS, exist_ok=True)
     plot_ref()
 else:
     os.makedirs(args.out_dir, exist_ok=True)
-    compute() if args.mode == 'compute' else plot()
+    plot()
