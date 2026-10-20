@@ -37,8 +37,9 @@ GW_TRUTH = dict(mass_ratio=1.0, chirp_mass=(30.0 * 30.0) ** 0.6 / 60.0 ** 0.2,
                 luminosity_distance=500.0, theta_jn=np.pi / 3, psi=np.pi / 2, phase=np.pi / 2, a_1=0.0,
                 a_2=0.0, zenith=2.3666, azimuth=2.9995)
 LEVELS = (1 - np.exp(-0.5), 1 - np.exp(-2))
+BINS_2D, BINS_1D = 25, 10
 STYLE = dict(levels=LEVELS, show_titles=False, plot_density=False, plot_datapoints=False,
-             max_n_ticks=4, bins=25, smooth=0.9, hist_bin_factor=10 / 25)
+             max_n_ticks=4, bins=BINS_2D, smooth=0.9, hist_bin_factor=BINS_1D / BINS_2D)
 
 
 def cols(post, keys):
@@ -53,9 +54,15 @@ for tag, (lens, label, order, lens_keys, col, truth) in RUNS.items():
 
     s = cols(post, lens_keys)
     t = [truth[k] for k in lens_keys]
-    fig = corner.corner(s, labels=[lab[k] for k in lens_keys], color=col, fill_contours=True,
+    rng = [(a.min(), a.max()) for a in s.T]
+    fig = corner.corner(s, labels=[lab[k] for k in lens_keys], color=col, fill_contours=True, range=rng,
                         label_kwargs=dict(fontsize=15), hist_kwargs=dict(density=True, lw=1.8, color=col),
                         **STYLE)
+    axes = np.array(fig.axes).reshape(len(lens_keys), len(lens_keys))
+    for i in range(len(lens_keys)):   # filled 1D marginals, as in the CIS figure
+        axes[i, i].hist(s[:, i], bins=BINS_1D, range=rng[i], density=True, histtype='stepfilled',
+                        color=col, alpha=0.25, lw=0)
+        axes[i, i].set_ylim(0, 1.05 * max(pp.get_xy()[:, 1].max() for pp in axes[i, i].patches))
     corner.overplot_lines(fig, t, color='black', lw=1.2)
     corner.overplot_points(fig, [t], marker='s', color='black', ms=6)
     fig.savefig(os.path.join(args.out_dir, f'lensing_corner_{tag}.png'), bbox_inches='tight', dpi=200)
