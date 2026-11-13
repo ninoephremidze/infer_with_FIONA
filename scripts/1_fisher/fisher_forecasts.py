@@ -1,19 +1,25 @@
 #!/usr/bin/env python
 """Fisher forecasts of the paper (the LISA and LIGO figures): Fisher ellipses of (Delta ln M_Lz, y, x_c) for a
-cored isothermal sphere (CIS) lens with y = 0.3 and x_c = 0.01. LISA sources are three SMBH binaries at z_s = 3
-(last month before merger), normalized to SNR 1e3. LIGO sources are five compact binaries at z_s = 0.1 with the
-aLIGO O4 design sensitivity, normalized to SNR 1e2.
+cored isothermal sphere (CIS) lens with y = 0.3 and x_c = 0.01. LISA sources are equal-mass SMBH binaries of
+10^4-10^8 Msun per component at z_s = 3 (last month before merger), LIGO sources are five compact binaries at
+z_s = 0.1 with the aLIGO O4 design sensitivity. The paper shows each source at its native (lensed) SNR (`--native`)
+and leaves out the 10^8+10^8 binary (native SNR 8). Without `--native`, every source is normalized to SNR 1e3 (LISA)
+or 1e2 (LIGO), as in Tambalo et al. (2023).
+
+Band. The full IMRPhenomD waveform (pycbc), through merger and ringdown up to its cutoff M f = 0.2 (`--band imr`),
+within 1e-4-1 Hz for LISA (1e-5 Hz for the 10^8+10^8 binary, which merges below 1e-4 Hz) and 10-1000 Hz for LIGO.
+The band of the 10^4+10^4 binary is ended at w = 250, FIONA's validated range (it loses < 0.01% of its SNR^2).
 
 Lens mass. Each source is paired with the lens mass for which w = 10 (`--w-star`) at f_*, the frequency below which 90%
-of the source's (unlensed) SNR^2 accumulates, so that its band runs from w ~ 0.4-3 to w ~ 10-50 and covers the wave-optics regime w ~ 1. `--m-lz` instead
-fixes one lens mass for every source.
+of the source's (unlensed) SNR^2 accumulates. `--m-lz` instead fixes one lens mass for every source.
 
 Numerics. F and its derivatives come from infer_with_fiona.fisher.compute_F_and_derivatives: FIONA with the
 converged `cis` Gauss-Legendre schedule, blended into the beyond-geometric-optics (bGO) sum above the measured,
 lens-dependent switch frequency w_s(x_c, y), with F referenced to the first-arriving image (T23's convention).
-Distance and phase are marginalized.
+Distance and phase are marginalized. 1024 log-spaced frequencies and a finite-difference step of 2e-5 (converged:
+within 1% of 256 frequencies and 5e-6).
 
-  python scripts/1_fisher/fisher_forecasts.py plot      # fisher_lisa.png, fisher_ligo.png -> outputs/figures
+  python scripts/1_fisher/fisher_forecasts.py plot --native --exclude SMBHB_1e8   # the paper's fisher_lisa/ligo.png
   python scripts/1_fisher/fisher_forecasts.py compute   # rerun the Fisher matrices -> data/fisher_covariances.npz
 
 `plot` needs only data/fisher_covariances.npz and reproduces the paper's figures exactly.
@@ -35,20 +41,29 @@ ap.add_argument('--gl-schedule', default='cis', help="quadrature schedule ('cis'
 ap.add_argument('--cache', default=str(paths.FISHER_COVARIANCES))
 ap.add_argument('--out-dir', default=str(paths.FIGURES_DIR))
 ap.add_argument('--suffix', default='')
+ap.add_argument('--native', action='store_true', help='plot at each source\'s native (lensed) SNR (the paper) instead of the fixed one')
+ap.add_argument('--band', choices=['imr', 'isco'], default='imr',
+                help='imr: full IMRPhenomD band up to its cutoff M f = 0.2 (the paper); isco: inspiral only, up to f_ISCO')
+ap.add_argument('--only', default='', help='comma-separated sources to compute (default: all)')
+ap.add_argument('--exclude', default='', help='comma-separated sources to leave out of the plot')
 args = ap.parse_args()
 
-Y_FID, XC_FID, N_F, EPS = 0.3, 0.01, 256, 5e-6
+Y_FID, XC_FID, N_F, EPS = 0.3, 0.01, 1024, 2e-5
 LISA_SOURCES = [  # name, m1, m2, label, colour
-    ('SMBHB_1e4', 1e4, 1e4, r'SMBHB ($10^4\,M_\odot+10^4\,M_\odot$)', '#4C72B0'),
-    ('SMBHB_1e5', 1e5, 1e5, r'SMBHB ($10^5\,M_\odot+10^5\,M_\odot$)', '#DD8452'),
-    ('SMBHB_1e6', 1e6, 1e6, r'SMBHB ($10^6\,M_\odot+10^6\,M_\odot$)', '#55A868'),
+    ('SMBHB_1e4', 1e4, 1e4, r'SMBHB ($10^4\,M_\odot+10^4\,M_\odot$)', '#EEA06C'),
+    ('SMBHB_1e5', 1e5, 1e5, r'SMBHB ($10^5\,M_\odot+10^5\,M_\odot$)', '#E0727F'),
+    ('SMBHB_1e6', 1e6, 1e6, r'SMBHB ($10^6\,M_\odot+10^6\,M_\odot$)', '#B95E99'),
+    ('SMBHB_1e7', 1e7, 1e7, r'SMBHB ($10^7\,M_\odot+10^7\,M_\odot$)', '#7D5AA6'),
+    ('SMBHB_1e8', 1e8, 1e8, r'SMBHB ($10^8\,M_\odot+10^8\,M_\odot$)', '#3F5791'),
 ]
+FMIN = {'SMBHB_1e8': 1e-5}   # 10^8+10^8 merges below 1e-4 Hz: band floor lowered to 1e-5 Hz for it only
+ONLY = args.only.split(',') if args.only else None
 LIGO_SOURCES = [  # name, m1, m2, label, colour, pycbc delta_f
-    ('BNS', 1.4, 1.4, r'BNS ($1.4\,M_\odot+1.4\,M_\odot$)', '#4C72B0', 1e-3),
-    ('NSBH', 10.0, 1.4, r'NSBH ($10\,M_\odot+1.4\,M_\odot$)', '#DD8452', 1 / 256),
-    ('BBH_10', 10.0, 10.0, r'BBH ($10\,M_\odot+10\,M_\odot$)', '#55A868', 1 / 64),
-    ('BBH_30', 30.0, 30.0, r'BBH ($30\,M_\odot+30\,M_\odot$)', '#C44E52', 1 / 16),
-    ('BBH_60', 60.0, 60.0, r'BBH ($60\,M_\odot+60\,M_\odot$)', '#8172B2', 1 / 4),
+    ('BNS', 1.4, 1.4, r'BNS ($1.4\,M_\odot+1.4\,M_\odot$)', '#EEA06C', 1e-3),
+    ('NSBH', 10.0, 1.4, r'NSBH ($10\,M_\odot+1.4\,M_\odot$)', '#E0727F', 1 / 256),
+    ('BBH_10', 10.0, 10.0, r'BBH ($10\,M_\odot+10\,M_\odot$)', '#B95E99', 1 / 64),
+    ('BBH_30', 30.0, 30.0, r'BBH ($30\,M_\odot+30\,M_\odot$)', '#7D5AA6', 1 / 16),
+    ('BBH_60', 60.0, 60.0, r'BBH ($60\,M_\odot+60\,M_\odot$)', '#3F5791', 1 / 4),
 ]
 DETECTORS = {'LISA': (LISA_SOURCES, 3.0, 1e-4, 1.0), 'LIGO': (LIGO_SOURCES, 0.1, 10.0, 1000.0)}
 
@@ -76,10 +91,14 @@ def compute():
         D_L = luminosity_distance(z_s)
         for src in sources:
             name, m1, m2 = src[:3]
-            dfreq = src[5] if det == 'LIGO' else 1e-7
+            if ONLY and name not in ONLY:
+                continue
+            dfreq = src[5] if det == 'LIGO' else (1e-8 if m1 >= 1e7 else 1e-7)
             M_tot, eta = m1 + m2, m1 * m2 / (m1 + m2) ** 2
-            f_lo, f_hi = max(f_1month(M_tot, eta, z_s), fmin), min(f_isco(M_tot, z_s), fmax)
-            if f_hi < fmin:
+            f_lo, f_hi = max(f_1month(M_tot, eta, z_s), FMIN.get(name, fmin)), min(f_isco(M_tot, z_s), fmax)
+            if args.band == 'imr':                       # full IMRPhenomD band, up to its cutoff M f = 0.2
+                f_hi = min(0.2 / (M_tot * (1 + z_s) * G_over_c3_Msun), fmax)
+            if f_hi < FMIN.get(name, fmin):
                 continue
             hp, _ = get_fd_waveform(approximant='IMRPhenomD', mass1=float(m1 * (1 + z_s)), mass2=float(m2 * (1 + z_s)),
                                     f_lower=float(f_lo), delta_f=float(dfreq), distance=float(D_L))
@@ -90,6 +109,13 @@ def compute():
             cum = np.concatenate([[0.0], np.cumsum(0.5 * (dens[1:] + dens[:-1]) * np.diff(fg))])
             f_star = float(np.interp(0.9 * cum[-1], cum, fg))
             M_Lz = args.m_lz if args.m_lz else args.w_star / (8 * np.pi * G_over_c3_Msun * f_star)
+            f_cap = 250.0 / (8 * np.pi * G_over_c3_Msun * M_Lz)   # FIONA validated to w <= 254
+            lost = float(1 - np.interp(min(f_cap, f_hi), fg, cum) / cum[-1]) if f_cap < f_hi else 0.0
+            if f_cap < f_hi:
+                print(f'{det} {name}: band capped at w = 250 (f = {f_cap:.3g} Hz of {f_hi:.3g} Hz), '
+                      f'dropping {100 * lost:.2f}% of the unlensed SNR^2', flush=True)
+                f_hi = f_cap
+            out[f'{det}_{name}_snr2_lost'] = lost
             f = np.logspace(np.log10(f_lo), np.log10(f_hi), N_F)
             h0 = np.interp(f, fp, hpa, left=0., right=0.)
             S = psds[det](f)
@@ -133,9 +159,12 @@ def plot():
         covs, labels, colors = [], [], []
         for src in sources:
             name, label, color = src[0], src[3], src[4]
-            if f'{det}_{name}_cov' not in d:
+            if f'{det}_{name}_cov' not in d or name in args.exclude.split(','):
                 continue
-            covs.append(d[f'{det}_{name}_cov'] * (float(d[f'{det}_{name}_snr']) / snr_fid) ** 2)
+            snr_nat = float(d[f'{det}_{name}_snr'])
+            if args.native:
+                snr_fid = snr_nat
+            covs.append(d[f'{det}_{name}_cov'] * (snr_nat / snr_fid) ** 2)
             labels.append(f'{label}, {mass_label(float(d[f"{det}_{name}_mlz"]))}')
             colors.append(color)
             print(f'{det} {name}: sigma at SNR {snr_fid:g} = {np.sqrt(np.diag(covs[-1]))}')

@@ -75,7 +75,8 @@ infer_with_FIONA/
 │   ├── 2_convergence/          derive the quadrature schedule and the bGO switch; FIONA vs exact point lens
 │   ├── 3_table/                build and validate the F table; check the Fourier convention
 │   ├── 4_inference/            Bayesian inference drivers and posterior extraction
-│   └── 5_figures/              the paper's posterior figures
+│   ├── 5_figures/              the paper's posterior figures and the Fisher waveform figure
+│   └── 6_cdm_halos/            detectability of cold-dark-matter (NFW) halos, Sec. V A (see its README)
 ├── data/                       inputs the code needs (described below)
 ├── notebooks/                  guided tours of the results
 ├── results/                    posterior samples of every run, and run statistics
@@ -89,12 +90,14 @@ infer_with_FIONA/
 | Path | Contents |
 |---|---|
 | `data/gl_rules/` | Precomputed Gauss-Legendre rules, $n = 250 \times 2^k$ up to 1,024,000. The largest took about 8 hours to generate. |
-| `data/bgo_switch/{cis,ula,pbh}.npz` | The measured bGO switch maps $w_s$ for each lens. |
+| `data/bgo_switch/{cis,ula,pbh,nfw}.npz` | The measured bGO switch maps $w_s$ for each lens. |
 | `data/caustic_cis_ycrit.pkl` | `glworia`'s tabulated caustic $y_{\rm crit}(x_c)$, which defines the CIS prior mask. |
 | `data/table_validation_points.json` | The test lenses for the CIS table validation. |
-| `data/fisher_covariances.npz` | The Fisher covariances behind the two Fisher figures, with $F$ referenced to the first image. |
-| `data/core_fisher_LIGO_CIS.npz` | Fisher grid of $(\ln M_{Lz}, y, x_c)$ over core size, lens mass and source position for the LIGO inference benchmark, used by notebook 04. |
-| `data/core_fisher_LISA_mbbh{1e4,1e6}_CIS.npz` | The same Fisher grid for two LISA sources at $z_S = 3$ ($10^4+10^4$ and $10^6+10^6\,M_\odot$, last month before merger, native SNR), used by notebook 04. |
+| `data/fisher_covariances.npz` | The Fisher covariances behind the two Fisher figures (full IMRPhenomD band, five LISA and five LIGO sources), with $F$ referenced to the first image. |
+| `data/fisher_waveforms.npz` | Lensed and unlensed strain of the Fisher sources, for the waveform figure. |
+| `data/core_fisher_LIGO_CIS.npz` | Fisher grid of $(\ln M_{Lz}, y, x_c)$ over core size, lens mass and source position for the LIGO inference benchmark, with bilby's default PSD as in the inference, used by notebook 04. |
+| `data/core_fisher_LISA_mbbh{1e4,1e5,1e6,1e7}_CIS.npz` | The same Fisher grid for the four LISA sources at $z_S = 3$ ($10^4+10^4$ to $10^7+10^7\,M_\odot$, last month before merger, full IMRPhenomD band, native SNR), used by notebook 04. |
+| `data/cdm/` | Post-processed CDM-halo detectability results (Sec. V A) and the native SNRs of the LISA sources (`scripts/6_cdm_halos/`). |
 | `data/external_bounds/` | Literature bounds for the comparison figures, from PBHbounds (Kavanagh) and AxionLimits (O'Hare), MIT licensed, unchanged. |
 | `data/nufht_tables.cache` | Precomputed tables of the compiled NUFHT, which it otherwise regenerates in every process. |
 
@@ -153,7 +156,7 @@ The commands below are run from the repository root.
 ### 1. Fisher forecasts
 
 ```bash
-python scripts/1_fisher/fisher_forecasts.py plot      # fisher_lisa.png, fisher_ligo.png from the shipped covariances
+python scripts/1_fisher/fisher_forecasts.py plot --native --exclude SMBHB_1e8   # fisher_lisa.png, fisher_ligo.png from the shipped covariances
 python scripts/1_fisher/fisher_forecasts.py compute   # rerun the Fisher matrices with FIONA
 sbatch slurm/core_size_fisher.sh                      # Fisher grid of the core size for the LIGO benchmark (notebook 04)
 ```
@@ -214,7 +217,9 @@ Results go to `outputs/runs/`. Runs checkpoint automatically, and resubmitting t
 
 | Paper figure | Script |
 |---|---|
-| Fisher forecasts for LISA and LIGO | `scripts/1_fisher/fisher_forecasts.py plot` |
+| Fisher forecasts for LISA and LIGO | `scripts/1_fisher/fisher_forecasts.py plot --native --exclude SMBHB_1e8` |
+| Lensed and unlensed waveforms of the Fisher sources | `scripts/5_figures/plot_fisher_waveforms.py plot` |
+| Detectability of cold-dark-matter halos | `TAG=_imr scripts/6_cdm_halos/plot_cdm_halos.py` |
 | Fisher vs inference width of the core size | `notebooks/04_core_size_calibration.ipynb` |
 | SIDM cross-section posteriors along the CIS mass scan | `notebooks/04_core_size_calibration.ipynb` |
 | SIDM limits against other probes | `notebooks/04_core_size_calibration.ipynb` |

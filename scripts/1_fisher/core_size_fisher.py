@@ -3,8 +3,10 @@
 against the mass-scan posteriors (notebooks/04_core_size_calibration.ipynb).
 
 Source: the PE benchmark (30+30 Msun at d_L = 500 Mpc, z_S = 0.108), full IMRPhenomD amplitude (pycbc) on 20-1024 Hz,
-aLIGO O4 design PSD, amplitude rescaled so the unlensed SNR equals the PE network SNR (31.7). With `LISA`, an
-equal-mass binary (--m-bbh) at z_S = 3, last month of inspiral, at its native SNR.
+bilby's default PSD aLIGO_ZERO_DET_high_P (the PSD of the inference runs), amplitude rescaled so the unlensed SNR
+equals the PE network SNR (31.7). With `LISA`, an equal-mass binary (--m-bbh) at z_S = 3, last month before merger,
+full IMRPhenomD amplitude (pycbc, as in the Fisher forecasts) through merger and ringdown up to M f = 0.2, at its
+native SNR. `--band isco` restores the earlier inspiral-only LISA band.
 
 Grid: x_c in {0.002 ... 0.45} (12 values), M_Lz log-spaced (15 values, 1-2000 Msun for LIGO), y in {0.1, 0.3, 0.6, 1, 2}.
 F and its derivatives come from infer_with_fiona.fisher.compute_F_and_derivatives (converged `cis` schedule, bGO
@@ -35,6 +37,7 @@ ap.add_argument('det', choices=['LIGO', 'LISA'])
 ap.add_argument('--smoke', action='store_true', help='one x_c, three masses')
 ap.add_argument('--n-f', type=int, default=512)
 ap.add_argument('--m-bbh', type=float, default=1.0e6, help='LISA component mass [Msun]')
+ap.add_argument('--band', choices=['imr', 'isco'], default='imr', help='LISA band (imr: up to M f = 0.2)')
 ap.add_argument('--out', default=None, help='output file (default: data/core_fisher_LIGO_CIS.npz for LIGO)')
 args = ap.parse_args()
 
@@ -51,7 +54,9 @@ if args.det == 'LIGO':
     MASSES = np.logspace(0, np.log10(2000.0), 15)
     f_vec = np.logspace(np.log10(20.0), np.log10(1024.0), args.n_f)
     h0 = imrphenomd_pycbc_amplitude(f_vec, m1 / (1 + z_s), m2 / (1 + z_s), z_s, D_L, 20.0, 1024.0, delta_f=1.0 / 64)
-    S_n = ligo_o4_psd(f_vec)
+    import bilby
+    _psd = np.loadtxt(os.path.join(os.path.dirname(bilby.__file__), 'gw/detector/noise_curves/aLIGO_ZERO_DET_high_P_psd.txt'))
+    S_n = np.interp(f_vec, _psd[:, 0], _psd[:, 1])           # bilby's default PSD, as in the inference runs
 else:
     m1 = m2 = args.m_bbh
     z_s = 3.0
@@ -59,8 +64,10 @@ else:
     MASSES = np.logspace(3, 9, 19)
     M_tot, eta = m1 + m2, 0.25
     f_lo, f_hi = max(f_1month(M_tot, eta, z_s), 1e-4), min(f_isco(M_tot, z_s), 1.0)
+    if args.band == 'imr':                              # full IMRPhenomD band, up to its cutoff M f = 0.2
+        f_hi = min(0.2 / (M_tot * (1 + z_s) * 4.925491e-6), 1.0)
     f_vec = np.logspace(np.log10(f_lo), np.log10(f_hi), args.n_f)
-    h0 = imrphenomd_amplitude(f_vec, M_tot, eta, z_s, D_L)
+    h0 = imrphenomd_pycbc_amplitude(f_vec, m1, m2, z_s, D_L, f_lo, f_hi, delta_f=1e-7)   # as in the Fisher forecasts
     S_n = lisa_psd(f_vec)
 
 snr_unl = np.sqrt(_inner_product(h0, h0, S_n, f_vec))
