@@ -65,6 +65,9 @@ def _make_lens_3p(lens_model, param3):
         return PointLens(psi0=1.0, xc=float(param3))
     elif lens_model == 'ULA':
         return ULASoliton(psi0=1.0, r_s=float(param3))
+    elif lens_model == 'NFWkappa':
+        # C24's NFW: lengths in units of the scale radius (x_s = 1), param3 = kappa = 4 kappa_s
+        return NFW(psi0=float(param3), xs=1.0)
     else:
         raise ValueError(f"Unknown lens_model: {lens_model!r}")
 

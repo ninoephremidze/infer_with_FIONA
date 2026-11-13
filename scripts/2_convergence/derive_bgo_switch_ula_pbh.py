@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""For the ULA soliton or the point lens (PBH): (1) measure the FIONA -> bGO switch frequency
+"""For the ULA soliton, the point lens (PBH), or C24's NFW (NFWkappa): (1) measure the FIONA -> bGO switch frequency
 w_s(shape, y), as derive_bgo_switch_cis.py did for CIS, and (2) check that the v4 GL schedule,
 derived for CIS, is also converged for this lens over the full w range of the PE prior.
 
@@ -26,7 +26,7 @@ import numpy as np
 
 ap = argparse.ArgumentParser(description=__doc__,
                              formatter_class=argparse.RawDescriptionHelpFormatter)
-ap.add_argument('--lens', choices=['ULA', 'PointLens'], required=True)
+ap.add_argument('--lens', choices=['ULA', 'PointLens', 'NFWkappa'], required=True)
 ap.add_argument('--n-workers', type=int, default=112)
 ap.add_argument('--quick', action='store_true')
 ap.add_argument('--gl-mult', type=int, default=1,
@@ -47,11 +47,13 @@ GL_DIR = str(paths.GL_RULES_DIR)
 EPS_LIST = (1e-2, 3e-3, 1e-3)
 W_MAX = 8.0 * np.pi * G_over_c3_Msun * 2000.0 * 1024.0          # ~253.6
 N_CAP = 1024000
-TAG = {'ULA': 'ula', 'PointLens': 'pbh'}[args.lens]
+TAG = {'ULA': 'ula', 'PointLens': 'pbh', 'NFWkappa': 'nfw'}[args.lens]
 
 if args.lens == 'ULA':
     SH = (np.array([0.01, 0.1, 1.0]) if args.quick else
           np.unique(np.concatenate([np.geomspace(0.01, 0.1, 15), np.linspace(0.1, 1.0, 31)])))
+elif args.lens == 'NFWkappa':
+    SH = np.array([0.1, 3.0, 8.0, 10.0]) if args.quick else np.linspace(0.1, 10.0, 34)
 else:
     SH = np.array([FWT.POINT_LENS_SOFTENING])
 Y = np.array([0.1, 0.3, 1.0, 5.0]) if args.quick else np.linspace(0.1, 5.0, 99)
@@ -89,8 +91,9 @@ gl_mode = np.where(capped, 'half_vs_v4', 'v4_vs_2x')
 if capped.any():
     gl_err[capped] = np.abs(F_half[capped] - F_v4[capped])
 mask = np.zeros((len(SH), len(Y)), dtype=bool)
-if args.lens == 'ULA':
-    mask = np.array([[bool(FWT.ula_prior_masked(s, y)) for y in Y] for s in SH])
+if args.lens in ('ULA', 'NFWkappa'):
+    masked = FWT.prior_masked_fn(args.lens)
+    mask = np.array([[bool(masked(s, y)) for y in Y] for s in SH])
 print(f'\n=== GL {K}x v4 check ({args.lens}): max over unmasked (shape, y) of |dF| per w ===')
 for iw, w in enumerate(W):
     e = gl_err[iw][~mask]
@@ -135,5 +138,5 @@ if len(SH) == 1:                                    # point lens: two identical 
 name = (f'bgo_switch_{TAG}' + (f'_glx{K}' if K > 1 else '') + ('_quick' if args.quick else '')
         + '.npz')
 np.savez(os.path.join(CHECKS, name), **out)
-print('Saved', os.path.join(CHECKS, name), '(production copies: data/bgo_switch/ula.npz, pbh.npz)')
+print('Saved', os.path.join(CHECKS, name), '(production copies: data/bgo_switch/ula.npz, pbh.npz, nfw.npz)')
 print('\nSaved', name)

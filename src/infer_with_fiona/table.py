@@ -283,10 +283,11 @@ def cis_image_set(xc, y, x_max=20.0, n_half=2000):
     return np.array(phi), np.array(mu), np.array(nm)
 
 
-# ─── Other lenses (ULA soliton, point lens / PBH): exact deflections, same image search ─
+# ─── Other lenses (ULA soliton, point lens / PBH, NFW): exact deflections, same image search ─
 #
 # The table code takes a infer_with_fiona.fisher lens name; its "x_c" axis then holds that lens's
-# shape parameter (ULA: r_s; point lens: the fixed Plummer softening, a single node). The
+# shape parameter (ULA: r_s; point lens: the fixed Plummer softening, a single node; NFWkappa:
+# C24's kappa = 4 kappa_s, with lengths in units of the NFW scale radius). The
 # GO residual needs every image's (phi, mu, n) to high accuracy at w up to 254, so the
 # deflection and its derivative are analytic here (generic_go's finite differences, with a
 # step >= 1e-3, are too coarse for the ULA core at small r_s). psi itself is FIONA's own
@@ -297,13 +298,15 @@ POINT_LENS_SOFTENING = 1.0e-5     # as infer_with_fiona.fisher's PBH runs (Eq. 9
 
 def make_lens(lens_model, shape):
     """fiona lens object for a infer_with_fiona.fisher lens name and shape parameter (psi0 = 1)."""
-    from .fiona.lenses import CIS, PointLens, ULASoliton
+    from .fiona.lenses import CIS, NFW, PointLens, ULASoliton
     if lens_model == 'CIS':
         return CIS(psi0=1.0, xc=max(float(shape), 1e-6))
     if lens_model == 'ULA':
         return ULASoliton(psi0=1.0, r_s=float(shape))
     if lens_model == 'PointLens':
         return PointLens(psi0=1.0, xc=float(shape))
+    if lens_model == 'NFWkappa':
+        return NFW(psi0=float(shape), xs=1.0)
     raise ValueError(f'unknown lens_model {lens_model!r}')
 
 
@@ -332,11 +335,45 @@ def _point_dalpha(r, eps):
     return (eps * eps - r * r) / (r * r + eps * eps) ** 2
 
 
+def _nfw_h(r):
+    """NFW enclosed-mass function h(r) = ln(r/2) + F(r) (Takahashi & Nakamura 2003), with F as
+    fiona.lenses.NFW._F_nfw. Below r = 0.5 it is rewritten without the ln(2/r) cancellation
+    (relative error ~1e-16 down to r = 1e-9, checked against mpmath derivatives of psi)."""
+    from .fiona.lenses import NFW
+    r = np.atleast_1d(np.asarray(r, dtype=float))
+    out = np.log(r / 2.0) + NFW._F_nfw(r)
+    lo = r < 0.5
+    rl = r[lo]
+    q = np.sqrt(1.0 - rl * rl)
+    out[lo] = (np.log1p(-rl * rl / (2.0 * (1.0 + q))) + np.log(2.0 / rl) * rl * rl / (1.0 + q)) / q
+    return out
+
+
+def _nfw_alpha(r, kappa):
+    """NFW deflection alpha(r) = kappa h(r) / r for fiona.lenses.NFW(psi0=kappa, xs=1)."""
+    r = np.atleast_1d(np.asarray(r, dtype=float))
+    return kappa * _nfw_h(r) / r
+
+
+def _nfw_dalpha(r, kappa):
+    """alpha'(r) = 2 kappa_conv(r) - alpha(r) / r, with kappa_conv = (kappa/2)(1 - F)/(r^2 - 1)
+    (its Taylor expansion within 1e-3 of r = 1)."""
+    from .fiona.lenses import NFW
+    r = np.atleast_1d(np.asarray(r, dtype=float))
+    d = r * r - 1.0
+    far = np.abs(d) > 1.0e-3
+    conv = 0.5 * kappa * np.where(far, (1.0 - NFW._F_nfw(r)) / np.where(far, d, 1.0),
+                                  1.0 / 3.0 - 0.4 * (r - 1.0))
+    return 2.0 * conv - _nfw_alpha(r, kappa) / r
+
+
 def _alpha_fns(lens_model, shape):
     if lens_model == 'ULA':
         return (lambda r: _ula_alpha(r, shape)), (lambda r: _ula_dalpha(r, shape))
     if lens_model == 'PointLens':
         return (lambda r: _point_alpha(r, shape)), (lambda r: _point_dalpha(r, shape))
+    if lens_model == 'NFWkappa':
+        return (lambda r: _nfw_alpha(r, shape)), (lambda r: _nfw_dalpha(r, shape))
     raise ValueError(f'no analytic deflection for {lens_model!r}')
 
 
@@ -419,12 +456,51 @@ def ula_prior_masked(rs, y, half_width=0.15):
     return np.abs(np.asarray(y, dtype=float) - ula_y_crit_fast(rs)) < half_width
 
 
+def nfw_y_crit(kappa):
+    """Radial caustic y_crit(kappa) of the NFW lens in C24's units (alpha' = 1 at r_crit). The
+    cusp makes it exist for every kappa: 2e-3 at kappa = 0.5, 1.66 at 8, 2.22 at 10."""
+    from scipy.optimize import brentq
+    out = []
+    for k in np.atleast_1d(np.asarray(kappa, dtype=float)):
+        rr = np.geomspace(1e-12, 50.0, 40000)
+        g = 1.0 - _nfw_dalpha(rr, k)
+        i = np.nonzero(g[:-1] * g[1:] < 0)[0]
+        if len(i) == 0:
+            out.append(-99.0)
+            continue
+        rc = brentq(lambda r: 1.0 - _nfw_dalpha(r, k)[0], rr[i[0]], rr[i[0] + 1], xtol=1e-15)
+        out.append(abs(rc - float(_nfw_alpha(rc, k)[0])))
+    out = np.array(out)
+    return out if np.ndim(kappa) else float(out[0])
+
+
+_NFW_Y_CRIT_TAB = None
+
+
+def nfw_y_crit_fast(kappa):
+    """nfw_y_crit from a tabulation over kappa in [0.05, 12] (2000 nodes, linear in kappa)."""
+    global _NFW_Y_CRIT_TAB
+    if _NFW_Y_CRIT_TAB is None:
+        g = np.linspace(0.05, 12.0, 2000)
+        _NFW_Y_CRIT_TAB = (g, nfw_y_crit(g))
+    g, yc = _NFW_Y_CRIT_TAB
+    return np.interp(np.asarray(kappa, dtype=float), g, yc)
+
+
+def nfw_prior_masked(kappa, y, half_width=0.2):
+    """True where the NFW PE prior excludes (kappa, y): |y - y_crit(kappa)| < 0.2, C24's NFW
+    mask (glworia's PE_submission_settings/NFW: fac 0.5, caps 0.2/0.2)."""
+    return np.abs(np.asarray(y, dtype=float) - nfw_y_crit_fast(kappa)) < half_width
+
+
 def prior_masked_fn(lens_model):
     """The prior-mask function (shape, y) -> bool used for table row trimming."""
     if lens_model == 'CIS':
         return cis_prior_masked
     if lens_model == 'ULA':
         return ula_prior_masked
+    if lens_model == 'NFWkappa':
+        return nfw_prior_masked
     return lambda shape, y: False         # point lens: caustic only at y = 0, outside the prior
 
 

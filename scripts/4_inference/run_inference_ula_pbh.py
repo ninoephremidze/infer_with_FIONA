@@ -2,7 +2,8 @@
 """
 Bayesian PE for the dark-matter lens profiles of the paper's Sec. "Constraints on dark matter
 models": the ultralight-axion (ULA) soliton (--lens ULA) and the primordial-black-hole point
-lens (--lens PBH). The SIDM case is the CIS lens (run_inference_cis.py).
+lens (--lens PBH), and, as a comparison with C24, the NFW halo (--lens NFW). The SIDM case is
+the CIS lens (run_inference_cis.py).
 
 Built from run_inference_cis.py (2026-10-09) and identical to it in everything not
 specific to the lens: injection (masses, spins, angles, distance, sky, time), bilby noise
@@ -27,6 +28,11 @@ Lens specifics:
        caustic lies above y = 5, so the mask only acts for r_s ~0.3-1.
   PBH: point lens with the fixed Plummer softening 1e-5 (not sampled), y uniform in [0.1, 5].
        The shape parameter 'lp' is held fixed at the softening (bilby fixed prior).
+  NFW: C24's NFW lens (glworia's NFWLens): lengths, and so y and the w of M_Lz, in units of
+       the scale radius; shape parameter kappa = 4 kappa_s (fiona.lenses.NFW(psi0=kappa, xs=1)),
+       prior uniform in [0.1, 10] as C24, injected kappa = 8 (C24's strongly lensed case). The
+       joint (y, kappa) prior masks |y - y_crit(kappa)| < 0.2, C24's NFW mask (fac 0.5, caps
+       0.2/0.2).
 
 The sampled shape parameter keeps the CIS script's name 'lp' (glworia's "lens parameter").
 
@@ -57,20 +63,21 @@ GL_DIR = str(paths.GL_RULES_DIR)
 
 ap = argparse.ArgumentParser(description=__doc__,
                               formatter_class=argparse.RawDescriptionHelpFormatter)
-ap.add_argument('--lens', choices=['ULA', 'PBH'], required=True)
+ap.add_argument('--lens', choices=['ULA', 'PBH', 'NFW'], required=True)
 ap.add_argument('--m-lz-fid', type=float, default=100.0,
                  help='Fiducial (injected) M_Lz [Msun]. (default: 100.0)')
-ap.add_argument('--shape-fid', type=float, default=0.1,
-                 help='Fiducial (injected) ULA core radius r_s (ignored for PBH). (default: 0.1)')
+ap.add_argument('--shape-fid', type=float, default=None,
+                 help='Fiducial (injected) ULA core radius r_s or NFW kappa (ignored for PBH). '
+                      '(default: 0.1, or 8 for NFW)')
 ap.add_argument('--y-fid', type=float, default=0.3,
                  help='Fiducial (injected) source position y. (default: 0.3)')
 ap.add_argument('--grid-res', choices=['tiny', 'low', 'medium', 'high'], default='high',
                  help="(shape, y) density of the F table: 'high'=201 (validated), 'medium'=101, "
                       "'low'=61, 'tiny'=21 (smoke tests only). (default: high)")
-ap.add_argument('--shape-prior-min', type=float, default=0.01,
-                 help='ULA r_s prior lower bound. (default: 0.01)')
-ap.add_argument('--shape-prior-max', type=float, default=1.0,
-                 help='ULA r_s prior upper bound. (default: 1.0)')
+ap.add_argument('--shape-prior-min', type=float, default=None,
+                 help='ULA r_s / NFW kappa prior lower bound. (default: 0.01, or 0.1 for NFW)')
+ap.add_argument('--shape-prior-max', type=float, default=None,
+                 help='ULA r_s / NFW kappa prior upper bound. (default: 1.0, or 10 for NFW)')
 ap.add_argument('--y-prior-min', type=float, default=0.1)
 ap.add_argument('--y-prior-max', type=float, default=5.0)
 ap.add_argument('--dl-prior-min', type=float, default=1.0)
@@ -101,7 +108,11 @@ ap.add_argument('--output-dir', default=None,
 args = ap.parse_args()
 
 LENS = args.lens
-LENS_MODEL = {'ULA': 'ULA', 'PBH': 'PointLens'}[LENS]
+LENS_MODEL = {'ULA': 'ULA', 'PBH': 'PointLens', 'NFW': 'NFWkappa'}[LENS]
+_SHAPE_DEFAULTS = {'NFW': (8.0, 0.1, 10.0)}.get(LENS, (0.1, 0.01, 1.0))   # (fid, min, max)
+for _k, _v in zip(('shape_fid', 'shape_prior_min', 'shape_prior_max'), _SHAPE_DEFAULTS):
+    if getattr(args, _k) is None:
+        setattr(args, _k, _v)
 if args.bgo_switch is None:
     args.bgo_switch = str(paths.BGO_SWITCH[LENS])
 if args.output_dir is None:
@@ -116,7 +127,8 @@ XC_FID = args.shape_fid
 Y_FID = args.y_fid
 
 label = args.out_label or (f'{LENS}_glworia_repro_mlz{M_LZ_FID:g}'
-                           + (f'_rs{XC_FID:g}' if LENS == 'ULA' else '') + f'_y{Y_FID:g}')
+                           + {'ULA': f'_rs{XC_FID:g}', 'NFW': f'_kappa{XC_FID:g}'}.get(LENS, '')
+                           + f'_y{Y_FID:g}')
 outdir = os.path.join(ROOT, args.output_dir, label)
 os.makedirs(outdir, exist_ok=True)
 
@@ -366,6 +378,18 @@ if LENS == 'ULA':
     )
     priors['y'] = Uniform2DMask(ylp_masked, name='y', latex_label='$y$', unit=None)
     priors['lp'] = Uniform2DMask(ylp_masked, name='lp', latex_label='$r_s$', unit=None)
+elif LENS == 'NFW':
+    # C24's NFW joint prior (glworia's PE_submission_settings/NFW: fac 0.5, caps 0.2/0.2, i.e.
+    # |y - y_crit(kappa)| < 0.2 excluded); table.nfw_prior_masked is the same mask.
+    crit_mask_settings = dict(fac=0.5, cap_high=0.2, cap_low=0.2,
+                              lens_param_to_y_crit=amplification.FWT.nfw_y_crit_fast)
+    ylp_masked = Uniform2DMaskDist(
+        names=['y', 'lp'],
+        bounds={'y': (Y_MIN, Y_MAX), 'lp': (XC_MIN, XC_MAX)},
+        crit_mask_settings=crit_mask_settings, mask_boxes=[],
+    )
+    priors['y'] = Uniform2DMask(ylp_masked, name='y', latex_label='$y$', unit=None)
+    priors['lp'] = Uniform2DMask(ylp_masked, name='lp', latex_label='$\\kappa$', unit=None)
 else:
     priors['y'] = bilby.core.prior.Uniform(minimum=Y_MIN, maximum=Y_MAX, name='y',
                                            latex_label='$y$')

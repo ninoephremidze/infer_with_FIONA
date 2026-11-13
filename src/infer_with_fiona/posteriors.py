@@ -22,7 +22,7 @@ import numpy as np
 from .paths import POSTERIORS_DIR, RUNS_DIR
 
 GW_PARAMS = ['mass_ratio', 'chirp_mass', 'luminosity_distance', 'theta_jn', 'psi', 'phase', 'a_1', 'a_2']
-LENS_PARAMS = {'CIS': ['MLz', 'y', 'lp'], 'ULA': ['MLz', 'y', 'lp'], 'PBH': ['MLz', 'y']}
+LENS_PARAMS = {'CIS': ['MLz', 'y', 'lp'], 'ULA': ['MLz', 'y', 'lp'], 'PBH': ['MLz', 'y'], 'NFW': ['MLz', 'y', 'lp']}
 TAIL_PARAMS = ['H1_time', 'zenith', 'azimuth']
 
 # The injection shared by every run (a GW150914-like 30 + 30 Msun binary at 500 Mpc, as in C24).
@@ -39,7 +39,7 @@ def search_order(lens):
 
 
 def fiona_label(lens, y, shape=None, mlz=100.0):
-    """Output label of a FIONA run in the paper (shape: x_c for CIS, r_s for ULA, unused for PBH)."""
+    """Output label of a FIONA run in the paper (shape: x_c for CIS, r_s for ULA, kappa for NFW, unused for PBH)."""
     if lens == 'CIS':
         return f'CIS_glworia_repro_mlz{mlz:g}_xc{shape:g}_y{y:.1f}_high_mlzprior0.1-2000.0_log-uniform_wtabv4lal_0'
     if lens == 'ULA':
@@ -47,6 +47,9 @@ def fiona_label(lens, y, shape=None, mlz=100.0):
                 '_log-uniform_wtabv4x4lal_0')
     if lens == 'PBH':
         return f'PBH_glworia_repro_mlz{mlz:g}_y{y:g}_high_mlzprior0.1-2000.0_log-uniform_wtabv4x4lal_0'
+    if lens == 'NFW':
+        return (f'NFW_glworia_repro_mlz{mlz:g}_kappa{shape:g}_y{y:g}_high_mlzprior0.1-2000.0'
+                '_log-uniform_wtabv4x4lal_0')
     raise ValueError(f'unknown lens {lens!r}')
 
 

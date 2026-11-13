@@ -16,8 +16,10 @@ GL_RULES_DIR = DATA_DIR / 'gl_rules'                    # cached Gauss-Legendre 
 BGO_SWITCH_DIR = DATA_DIR / 'bgo_switch'
 BGO_SWITCH = {'CIS': BGO_SWITCH_DIR / 'cis.npz',        # w_s(x_c, y) maps per lens model
               'ULA': BGO_SWITCH_DIR / 'ula.npz',
-              'PointLens': BGO_SWITCH_DIR / 'pbh.npz'}
+              'PointLens': BGO_SWITCH_DIR / 'pbh.npz',
+              'NFWkappa': BGO_SWITCH_DIR / 'nfw.npz'}
 BGO_SWITCH['PBH'] = BGO_SWITCH['PointLens']
+BGO_SWITCH['NFW'] = BGO_SWITCH['NFWkappa']
 CAUSTIC_PKL = DATA_DIR / 'caustic_cis_ycrit.pkl'        # glworia's tabulated y_crit(x_c)
 TABLE_VALIDATION_POINTS = DATA_DIR / 'table_validation_points.json'
 FISHER_COVARIANCES = DATA_DIR / 'fisher_covariances.npz'

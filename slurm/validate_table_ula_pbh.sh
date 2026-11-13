@@ -8,7 +8,7 @@
 #SBATCH -o outputs/logs/%x_%j.out
 #SBATCH -e outputs/logs/%x_%j.err
 # Builds + caches the production F table for ULA or PBH and validates it against direct FIONA
-# (scripts/3_table/validate_table_ula_pbh.py). Usage: sbatch slurm/validate_table_ula_pbh.sh --lens ULA|PBH [args]
+# (scripts/3_table/validate_table_ula_pbh.py). Usage: sbatch slurm/validate_table_ula_pbh.sh --lens ULA|PBH|NFW [args]
 # Run from the repository root (or set INFER_WITH_FIONA_ROOT); PYTHON selects the interpreter.
 cd "${INFER_WITH_FIONA_ROOT:-$SLURM_SUBMIT_DIR}"
 PYTHON=${PYTHON:-python}

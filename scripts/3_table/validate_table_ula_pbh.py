@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build (or load) the production F table for the ULA soliton or the point lens and validate
+"""Build (or load) the production F table for the ULA soliton, the point lens, or C24's NFW and validate
 the full production chain (amplification.HybridF: table + GO residual + lens-dependent bGO switch)
 against direct FIONA, as validate_table_cis.py did for CIS (job 48205398).
 
@@ -26,7 +26,7 @@ from scipy.constants import c as C_SI, G as G_SI
 
 ap = argparse.ArgumentParser(description=__doc__,
                              formatter_class=argparse.RawDescriptionHelpFormatter)
-ap.add_argument('--lens', choices=['ULA', 'PBH'], required=True)
+ap.add_argument('--lens', choices=['ULA', 'PBH', 'NFW'], required=True)
 ap.add_argument('--gl-schedule', default='steep_core', choices=quadrature.CHOICES)
 ap.add_argument('--n-grid', type=int, default=201)
 ap.add_argument('--n-test', type=int, default=120)
@@ -44,9 +44,10 @@ from infer_with_fiona.fiona.axisym import FresnelNUFHTLensBatched
 
 ROOT = str(paths.REPO_ROOT)
 GL_DIR = str(paths.GL_RULES_DIR)
-LM = {'ULA': 'ULA', 'PBH': 'PointLens'}[args.lens]
+LM = {'ULA': 'ULA', 'PBH': 'PointLens', 'NFW': 'NFWkappa'}[args.lens]
 SW = str(paths.BGO_SWITCH[args.lens])
-SH_MIN, SH_MAX, SH_FID = ((0.01, 1.0, 0.1) if LM == 'ULA' else (FWT.POINT_LENS_SOFTENING,) * 3)
+SH_MIN, SH_MAX, SH_FID = {'ULA': (0.01, 1.0, 0.1), 'NFWkappa': (0.1, 10.0, 8.0)}.get(
+    LM, (FWT.POINT_LENS_SOFTENING,) * 3)
 MTOW = 8.0 * np.pi * G_SI / C_SI ** 3 * 1.9884099e+30        # glworia's, as the PE scripts
 
 t0 = time.time()
@@ -59,7 +60,7 @@ rng = np.random.default_rng(args.seed)
 tests = [(SH_FID, 0.3, 100.0), (SH_FID, 0.3, 2000.0)]
 masked = FWT.prior_masked_fn(LM)
 while len(tests) < args.n_test:
-    s = rng.uniform(SH_MIN, SH_MAX) if LM == 'ULA' else SH_FID
+    s = rng.uniform(SH_MIN, SH_MAX) if LM != 'PointLens' else SH_FID
     y = rng.uniform(0.1, 5.0)
     if masked(s, y):
         continue

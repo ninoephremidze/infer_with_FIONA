@@ -38,6 +38,7 @@ GW_TRUTH = dict(mass_ratio=1.0, chirp_mass=(30.0 * 30.0) ** 0.6 / 60.0 ** 0.2,
                 a_2=0.0, zenith=2.3666, azimuth=2.9995)
 LEVELS = (1 - np.exp(-0.5), 1 - np.exp(-2))
 BINS_2D, BINS_1D = 25, 10
+LENS_FIG_IN = 7.2       # inches, the size corner chooses for the 3x3 ULA figure
 STYLE = dict(levels=LEVELS, show_titles=False, plot_density=False, plot_datapoints=False,
              max_n_ticks=4, bins=BINS_2D, smooth=0.9, hist_bin_factor=BINS_1D / BINS_2D)
 
@@ -55,7 +56,10 @@ for tag, (lens, label, order, lens_keys, col, truth) in RUNS.items():
     s = cols(post, lens_keys)
     t = [truth[k] for k in lens_keys]
     rng = [(a.min(), a.max()) for a in s.T]
-    fig = corner.corner(s, labels=[lab[k] for k in lens_keys], color=col, fill_contours=True, range=rng,
+    # the same canvas for both lenses, so that the 2x2 PBH and 3x3 ULA figures show text of the same size once both
+    # are scaled to the column width
+    fig = plt.figure(figsize=(LENS_FIG_IN, LENS_FIG_IN))
+    fig = corner.corner(s, labels=[lab[k] for k in lens_keys], color=col, fill_contours=True, range=rng, fig=fig,
                         label_kwargs=dict(fontsize=15), hist_kwargs=dict(density=True, lw=1.8, color=col),
                         **STYLE)
     axes = np.array(fig.axes).reshape(len(lens_keys), len(lens_keys))
